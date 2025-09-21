@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1"> <!-- 追加 -->
-  <title>クイズアプリ</title>
+  <title>ポケモン対戦クイズ</title>
   <style>
     :root{
       --bg: #f8f9fa;
@@ -126,69 +126,125 @@
   </div>
 
   <script>
-    const quiz = [
-      {
-        question: "ガブリアスの素早さ種族値はいくつ？",
-        answers: ["100", "101", "102", "103"],
-        correct: "102"
-      },
-      {
-        question: "ナマコブシの英語名は？",
-        answers: ["Pyukumuku", "Pincurchin", "Snom", "Shuckle"],
-        correct: "Pyukumuku"
-      },
-      {
-        question: "メガガルーラへのけたぐりの威力は？",
-        answers: ["100", "110", "120", "130"],
-        correct: "100"
-      }
-    ];
+    // 1. CSVデータ読み込み
+    async function loadCSV(url) {
+      const res = await fetch(url);
+      const text = await res.text();
+      const lines = text.trim().split('\n');
+      const header = lines[0].split(',');
+      return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        header.forEach((h, i) => obj[h] = values[i]);
+        return obj;
+      });
+    }
 
-    let current = 0;
-    let score = 0;
+    // 2. ダメージ計算式（簡易版）
+    // level: 50固定, 乱数・タイプ一致・相性は未考慮
+    function calcDamage({atkStat, defStat, movePower}) {
+      const level = 50;
+      // ポケモン公式ダメージ計算式（簡易）
+      // ダメージ = (((2*Lv/5+2) * 威力 * 攻撃/防御) / 50) + 2
+      return Math.floor((((2 * level / 5 + 2) * movePower * atkStat / defStat) / 50) + 2);
+    }
 
+    // 例: stats/movesの読み込み
+    let pokemonStats = [];
+    let pokemonMoves = [];
+    Promise.all([
+      loadCSV('pokemon_stats.csv'),
+      loadCSV('pokemon_moves.csv')
+    ]).then(([stats, moves]) => {
+      pokemonStats = stats;
+      pokemonMoves = moves;
+      // ここでクイズ出題やUI拡張が可能
+      // 例: console.log(pokemonStats, pokemonMoves);
+    });
+
+    // クイズ：攻撃側ポケモン・技・防御側ポケモンをランダム表示し、ダメージ量を答える
     const questionEl = document.getElementById("question");
     const answersEl = document.getElementById("answers");
     const resultEl = document.getElementById("result");
 
-    function showQuestion() {
-      const q = quiz[current];
-      questionEl.textContent = q.question;
+    let correctDamage = null;
+    let score = 0;
+    let total = 0;
+
+    function getRandom(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function generateQuiz() {
+      // 攻撃側・防御側ポケモン、技をランダム選択
+      const attacker = getRandom(pokemonStats);
+      const defender = getRandom(pokemonStats);
+      const move = getRandom(pokemonMoves);
+
+      // 技の分類で攻撃/特攻、防御/特防を選択
+      let atkStat, defStat;
+      if (move["分類"] === "物理") {
+        atkStat = Number(attacker["攻撃"]);
+        defStat = Number(defender["防御"]);
+      } else {
+        atkStat = Number(attacker["特攻"]);
+        defStat = Number(defender["特防"]);
+      }
+      const movePower = Number(move["威力"]);
+
+      // 威力0や空欄技はスキップ
+      if (!movePower) return generateQuiz();
+
+      correctDamage = calcDamage({atkStat, defStat, movePower});
+
+      // 問題文生成
+      questionEl.textContent = `${attacker["名前"]}（攻撃側）が「${move["技名"]}」で、${defender["名前"]}（防御側）を攻撃！ダメージ量は？`;
+
+      // 選択肢生成（正解±10%の範囲で4択）
+      const choices = [];
+      choices.push(correctDamage);
+      for (let i = 0; i < 3; i++) {
+        let delta = Math.floor(correctDamage * (Math.random() * 0.2 - 0.1));
+        let val = correctDamage + delta;
+        if (val <= 0 || choices.includes(val)) val = correctDamage + (i+1)*5;
+        choices.push(val);
+      }
+      // シャッフル
+      choices.sort(() => Math.random() - 0.5);
+
       answersEl.innerHTML = "";
-      q.answers.forEach(answer => {
+      choices.forEach(answer => {
         const btn = document.createElement("button");
         btn.textContent = answer;
         btn.onclick = () => checkAnswer(answer);
         btn.type = "button";
         answersEl.appendChild(btn);
       });
+      resultEl.textContent = "";
     }
 
     function checkAnswer(answer) {
-      if (answer === quiz[current].correct) {
+      total++;
+      if (Number(answer) === correctDamage) {
         score++;
         resultEl.textContent = "✅ 正解！";
         resultEl.style.color = "green";
       } else {
-        resultEl.textContent = "❌ 不正解...";
+        resultEl.textContent = `❌ 不正解... 正解は ${correctDamage}`;
         resultEl.style.color = "red";
       }
-      current++;
-      if (current < quiz.length) {
-        setTimeout(showQuestion, 1000);
-      } else {
-        setTimeout(showResult, 1000);
-      }
+      setTimeout(generateQuiz, 1200);
     }
 
-    function showResult() {
-      questionEl.textContent = "結果発表！";
-      answersEl.innerHTML = "";
-      resultEl.textContent = `あなたのスコア: ${score} / ${quiz.length}`;
-      resultEl.style.color = "black";
-    }
-
-    showQuestion();
+    // stats/movesロード後にクイズ開始
+    Promise.all([
+      loadCSV('pokemon_stats.csv'),
+      loadCSV('pokemon_moves.csv')
+    ]).then(([stats, moves]) => {
+      pokemonStats = stats;
+      pokemonMoves = moves;
+      generateQuiz();
+    });
   </script>
 </body>
 </html>
