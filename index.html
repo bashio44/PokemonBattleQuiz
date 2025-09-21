@@ -2,71 +2,145 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1"> <!-- 追加 -->
   <title>クイズアプリ</title>
   <style>
+    :root{
+      --bg: #f8f9fa;
+      --card: #ffffff;
+      --primary: #007bff;
+      --primary-dark: #0056b3;
+      --radius: 12px;
+      --gap: 12px;
+    }
+
+    /* ページ全体 */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      font-family: Inter, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", Arial, sans-serif;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
     body {
-      font-family: Arial, sans-serif;
-      background: #f8f9fa;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      min-height: 100vh;
     }
+
+    /* クイズカード */
     .quiz-container {
-      background: #fff;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      width: 300px;
+      background: var(--card);
+      padding: clamp(16px, 3.5vw, 28px);
+      border-radius: var(--radius);
+      box-shadow: 0 6px 18px rgba(10,10,20,0.08);
+      width: min(92vw, 560px);
+      max-width: 95%;
       text-align: center;
+      transition: transform 180ms ease;
     }
+    .quiz-container:focus-within,
+    .quiz-container:hover {
+      transform: translateY(-4px);
+    }
+
     h2 {
-      margin-bottom: 20px;
+      margin: 0 0 14px 0;
+      font-size: clamp(18px, 3.6vw, 22px);
+      line-height: 1.3;
     }
+
+    /* 答えボタン群をグリッドで整列 */
+    #answers {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: var(--gap);
+      margin-top: 6px;
+    }
+
     button {
-      display: block;
-      width: 100%;
-      margin: 8px 0;
-      padding: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(10px, 2.4vw, 14px);
       border: none;
-      border-radius: 8px;
-      background: #007bff;
+      border-radius: 10px;
+      background: var(--primary);
       color: white;
       cursor: pointer;
-      font-size: 16px;
+      font-size: clamp(14px, 2.6vw, 16px);
+      font-weight: 600;
+      transition: background 120ms ease, transform 80ms ease;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      width: 100%;
+      min-height: 44px; /* タップターゲット確保 */
     }
     button:hover {
-      background: #0056b3;
+      background: var(--primary-dark);
     }
+    button:active {
+      transform: translateY(1px) scale(0.997);
+    }
+    button:focus {
+      outline: 3px solid rgba(0,123,255,0.18);
+      outline-offset: 2px;
+    }
+
     #result {
-      margin-top: 15px;
-      font-weight: bold;
+      margin-top: 14px;
+      font-weight: 700;
+      font-size: 15px;
+      min-height: 1.2em;
+      transition: color 120ms ease;
+    }
+
+    /* PC向け微調整 */
+    @media (min-width: 900px) {
+      .quiz-container {
+        width: 420px;
+        padding: 28px;
+      }
+      #answers {
+        gap: 14px;
+      }
+    }
+
+    /* ダークモードサポート（任意） */
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f1720; --card: #0b1220; --primary: #3b82f6; --primary-dark: #2563eb; }
+      body { color: #e6eef8; }
+      .quiz-container { box-shadow: 0 6px 24px rgba(0,0,0,0.6); }
+      button { box-shadow: none; }
     }
   </style>
 </head>
 <body>
-  <div class="quiz-container">
+  <div class="quiz-container" role="main" aria-labelledby="question">
     <h2 id="question">問題がここに表示されます</h2>
-    <div id="answers"></div>
-    <p id="result"></p>
+    <div id="answers" aria-live="polite"></div>
+    <p id="result" aria-atomic="true"></p>
   </div>
 
   <script>
     const quiz = [
       {
-        question: "日本の首都はどこ？",
-        answers: ["大阪", "東京", "名古屋", "札幌"],
-        correct: "東京"
+        question: "ガブリアスの素早さ種族値はいくつ？",
+        answers: ["100", "101", "102", "103"],
+        correct: "102"
       },
       {
-        question: "3 + 5 はいくつ？",
-        answers: ["5", "8", "9", "10"],
-        correct: "8"
+        question: "ナマコブシの英語名は？",
+        answers: ["Pyukumuku", "Pincurchin", "Snom", "Shuckle"],
+        correct: "Pyukumuku"
       },
       {
-        question: "富士山の標高は約何メートル？",
-        answers: ["2776m", "3376m", "3776m", "4176m"],
-        correct: "3776m"
+        question: "メガガルーラへのけたぐりの威力は？",
+        answers: ["100", "110", "120", "130"],
+        correct: "100"
       }
     ];
 
@@ -85,6 +159,7 @@
         const btn = document.createElement("button");
         btn.textContent = answer;
         btn.onclick = () => checkAnswer(answer);
+        btn.type = "button";
         answersEl.appendChild(btn);
       });
     }
