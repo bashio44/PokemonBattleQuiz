@@ -120,6 +120,16 @@
 </head>
 <body>
   <div class="quiz-container" role="main" aria-labelledby="question">
+    <div style="display:flex; justify-content:center; align-items:center; gap:24px; margin-bottom:10px;">
+      <div>
+        <img id="attackerIcon" src="" alt="攻撃側ポケモン" width="72" height="72"><br>
+        <span id="attackerName"></span>
+      </div>
+      <div>
+        <img id="defenderIcon" src="" alt="防御側ポケモン" width="72" height="72"><br>
+        <span id="defenderName"></span>
+      </div>
+    </div>
     <h2 id="question">問題がここに表示されます</h2>
     <div id="answers" aria-live="polite"></div>
     <p id="result" aria-atomic="true"></p>
@@ -140,13 +150,48 @@
       });
     }
 
-    // 2. ダメージ計算式（簡易版）
-    // level: 50固定, 乱数・タイプ一致・相性は未考慮
-    function calcDamage({atkStat, defStat, movePower}) {
+    // 全タイプ対応のタイプ相性表（攻撃技タイプ→防御ポケモンタイプ）
+    // 公式準拠（抜粋・主要タイプのみ記載、必要に応じて拡張）
+    const typeChart = {
+      'ノーマル':   { 'いわ': 0.5, 'ゴースト': 0, 'はがね': 0.5 },
+      'ほのお':     { 'くさ': 2, 'みず': 0.5, 'ほのお': 0.5, 'こおり': 2, 'むし': 2, 'いわ': 0.5, 'ドラゴン': 0.5, 'はがね': 2 },
+      'みず':       { 'ほのお': 2, 'みず': 0.5, 'くさ': 0.5, 'じめん': 2, 'いわ': 2, 'ドラゴン': 0.5 },
+      'でんき':     { 'みず': 2, 'でんき': 0.5, 'じめん': 0, 'ひこう': 2, 'くさ': 0.5, 'ドラゴン': 0.5 },
+      'くさ':       { 'みず': 2, 'ほのお': 0.5, 'くさ': 0.5, 'じめん': 2, 'ひこう': 0.5, 'むし': 0.5, 'いわ': 2, 'ドラゴン': 0.5, 'はがね': 0.5 },
+      'こおり':     { 'ほのお': 0.5, 'みず': 0.5, 'くさ': 2, 'じめん': 2, 'ひこう': 2, 'ドラゴン': 2, 'こおり': 0.5, 'はがね': 0.5 },
+      'かくとう':   { 'ノーマル': 2, 'こおり': 2, 'いわ': 2, 'あく': 2, 'はがね': 2, 'ひこう': 0.5, 'エスパー': 0.5, 'むし': 0.5, 'ゴースト': 0, 'フェアリー': 0.5 },
+      'どく':       { 'くさ': 2, 'どく': 0.5, 'じめん': 0.5, 'いわ': 0.5, 'ゴースト': 0.5, 'はがね': 0, 'フェアリー': 2 },
+      'じめん':     { 'ほのお': 2, 'でんき': 2, 'くさ': 0.5, 'どく': 2, 'ひこう': 0, 'むし': 0.5, 'いわ': 2, 'はがね': 2 },
+      'ひこう':     { 'くさ': 2, 'でんき': 0.5, 'ひこう': 0.5, 'むし': 2, 'いわ': 0.5, 'はがね': 0.5 },
+      'エスパー':   { 'かくとう': 2, 'どく': 2, 'エスパー': 0.5, 'はがね': 0.5, 'あく': 0 },
+      'むし':       { 'くさ': 2, 'ほのお': 0.5, 'かくとう': 0.5, 'どく': 0.5, 'ひこう': 0.5, 'エスパー': 2, 'ゴースト': 0.5, 'あく': 2, 'はがね': 0.5, 'フェアリー': 0.5 },
+      'いわ':       { 'ほのお': 2, 'こおり': 2, 'かくとう': 0.5, 'じめん': 0.5, 'ひこう': 2, 'むし': 2, 'はがね': 0.5 },
+      'ゴースト':   { 'ノーマル': 0, 'エスパー': 2, 'ゴースト': 2, 'あく': 0.5 },
+      'ドラゴン':   { 'ドラゴン': 2, 'はがね': 0.5, 'フェアリー': 0 },
+      'あく':       { 'エスパー': 2, 'かくとう': 0.5, 'あく': 0.5, 'フェアリー': 0.5 },
+      'はがね':     { 'ほのお': 0.5, 'みず': 0.5, 'でんき': 0.5, 'こおり': 2, 'いわ': 2, 'はがね': 0.5, 'フェアリー': 2 },
+      'フェアリー': { 'かくとう': 2, 'どく': 0.5, 'はがね': 0.5, 'ドラゴン': 2, 'あく': 2, 'フェアリー': 1 },
+    };
+
+    // 2. ダメージ計算式（複数タイプ対応）
+    function getTypeEffectiveness(moveType, defenderTypes) {
+      let eff = 1;
+      defenderTypes.forEach(type => {
+        if (!type) return;
+        if (typeChart[moveType] && typeChart[moveType][type]) {
+          eff *= typeChart[moveType][type];
+        } else {
+          eff *= 1;
+        }
+      });
+      return eff;
+    }
+
+    function calcDamage({atkStat, defStat, movePower, moveType, defenderTypes}) {
       const level = 50;
-      // ポケモン公式ダメージ計算式（簡易）
-      // ダメージ = (((2*Lv/5+2) * 威力 * 攻撃/防御) / 50) + 2
-      return Math.floor((((2 * level / 5 + 2) * movePower * atkStat / defStat) / 50) + 2);
+      let base = (((2 * level / 5 + 2) * movePower * atkStat / defStat) / 50) + 2;
+      const effectiveness = getTypeEffectiveness(moveType, defenderTypes);
+      return Math.floor(base * effectiveness);
     }
 
     // 例: stats/movesの読み込み
@@ -163,9 +208,13 @@
     });
 
     // クイズ：攻撃側ポケモン・技・防御側ポケモンをランダム表示し、ダメージ量を答える
-    const questionEl = document.getElementById("question");
-    const answersEl = document.getElementById("answers");
-    const resultEl = document.getElementById("result");
+  const questionEl = document.getElementById("question");
+  const answersEl = document.getElementById("answers");
+  const resultEl = document.getElementById("result");
+  const attackerIcon = document.getElementById("attackerIcon");
+  const defenderIcon = document.getElementById("defenderIcon");
+  const attackerName = document.getElementById("attackerName");
+  const defenderName = document.getElementById("defenderName");
 
     let correctDamage = null;
     let score = 0;
@@ -191,14 +240,23 @@
         defStat = Number(defender["特防"]);
       }
       const movePower = Number(move["威力"]);
+      const moveType = move["タイプ"];
+      // 防御側ポケモンのタイプ1・タイプ2
+      const defenderTypes = [defender["タイプ1"] || "ノーマル", defender["タイプ2"]].filter(Boolean);
 
       // 威力0や空欄技はスキップ
       if (!movePower) return generateQuiz();
 
-      correctDamage = calcDamage({atkStat, defStat, movePower});
+      correctDamage = calcDamage({atkStat, defStat, movePower, moveType, defenderTypes});
+
+      // アイコン表示
+      attackerIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(attacker["No"])}.png`;
+      defenderIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(defender["No"])}.png`;
+      attackerName.textContent = attacker["名前"];
+      defenderName.textContent = defender["名前"];
 
       // 問題文生成
-      questionEl.textContent = `${attacker["名前"]}（攻撃側）が「${move["技名"]}」で、${defender["名前"]}（防御側）を攻撃！ダメージ量は？`;
+      questionEl.textContent = `${attacker["名前"]}（攻撃側）が「${move["技名"]}」（${moveType}タイプ）で、${defender["名前"]}（${defenderTypes.join("・")}, 防御側）を攻撃！ダメージ量は？`;
 
       // 選択肢生成（正解±10%の範囲で4択）
       const choices = [];
