@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>クイズアプリ</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f9fa;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .quiz-container {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      width: 300px;
+      text-align: center;
+    }
+    h2 {
+      margin-bottom: 20px;
+    }
+    button {
+      display: block;
+      width: 100%;
+      margin: 8px 0;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    #result {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="quiz-container">
+    <h2 id="question">問題がここに表示されます</h2>
+    <div id="answers"></div>
+    <p id="result"></p>
+  </div>
+
+  <script>
+    const quiz = [
+      {
+        question: "日本の首都はどこ？",
+        answers: ["大阪", "東京", "名古屋", "札幌"],
+        correct: "東京"
+      },
+      {
+        question: "3 + 5 はいくつ？",
+        answers: ["5", "8", "9", "10"],
+        correct: "8"
+      },
+      {
+        question: "富士山の標高は約何メートル？",
+        answers: ["2776m", "3376m", "3776m", "4176m"],
+        correct: "3776m"
+      }
+    ];
+
+    let current = 0;
+    let score = 0;
+
+    const questionEl = document.getElementById("question");
+    const answersEl = document.getElementById("answers");
+    const resultEl = document.getElementById("result");
+
+    function showQuestion() {
+      const q = quiz[current];
+      questionEl.textContent = q.question;
+      answersEl.innerHTML = "";
+      q.answers.forEach(answer => {
+        const btn = document.createElement("button");
+        btn.textContent = answer;
+        btn.onclick = () => checkAnswer(answer);
+        answersEl.appendChild(btn);
+      });
+    }
+
+    function checkAnswer(answer) {
+      if (answer === quiz[current].correct) {
+        score++;
+        resultEl.textContent = "✅ 正解！";
+        resultEl.style.color = "green";
+      } else {
+        resultEl.textContent = "❌ 不正解...";
+        resultEl.style.color = "red";
+      }
+      current++;
+      if (current < quiz.length) {
+        setTimeout(showQuestion, 1000);
+      } else {
+        setTimeout(showResult, 1000);
+      }
+    }
+
+    function showResult() {
+      questionEl.textContent = "結果発表！";
+      answersEl.innerHTML = "";
+      resultEl.textContent = `あなたのスコア: ${score} / ${quiz.length}`;
+      resultEl.style.color = "black";
+    }
+
+    showQuestion();
+  </script>
+</body>
+</html>
