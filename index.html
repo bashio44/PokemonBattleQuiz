@@ -262,11 +262,10 @@
       const move = getRandom(pokemonMoves);
 
       // 技の分類で攻撃/特攻、防御/特防を選択
-      let atkStat, defStat;
       let statKeyAtk = move["分類"] === "物理" ? "攻撃" : "特攻";
       let statKeyDef = move["分類"] === "物理" ? "防御" : "特防";
-      atkStat = Number(attacker[statKeyAtk]);
-      defStat = Number(defender[statKeyDef]);
+      const atkStat = Number(attacker[statKeyAtk]);
+      const defStat = Number(defender[statKeyDef]);
       const movePower = Number(move["威力"]);
       const moveType = move["タイプ"];
       const defenderTypes = [defender["タイプ1"] || "ノーマル", defender["タイプ2"]].filter(Boolean);
@@ -274,19 +273,15 @@
       // 威力0や空欄技はスキップ
       if (!movePower) return generateQuiz();
 
-      // 片方の努力値・持ち物をランダム決定
-      const atkEV = [0, 252][Math.floor(Math.random()*2)];
-      const atkItem = ["", "こだわりハチマキ", "こだわりメガネ"][Math.floor(Math.random()*3)];
-      // 防御側の努力値・持ち物候補
-      const defEVs = [0, 252];
-  const defItems = ["", "突撃チョッキ"];
+      // 両者の努力値・持ち物をランダム決定（クイズの対象がどちらかは後で選ぶ）
+      const atkEV = [0, 252][Math.floor(Math.random() * 2)];
+      const defEV = [0, 252][Math.floor(Math.random() * 2)];
+      const atkItems = ["", "こだわりハチマキ", "こだわりメガネ"];
+      const defItems = ["", "突撃チョッキ"];
+      const atkItem = atkItems[Math.floor(Math.random() * atkItems.length)];
+      const defItem = defItems[Math.floor(Math.random() * defItems.length)];
 
-      // 正解（防御側の努力値 or 持ち物）をランダムで選択
-      const askEV = Math.random() < 0.5;
-      const defEV = askEV ? defEVs[Math.floor(Math.random()*defEVs.length)] : 252;
-      const defItem = askEV ? "" : defItems[Math.floor(Math.random()*defItems.length)];
-
-      // ダメージ計算
+      // ダメージ計算（実際の値で算出）
       correctDamage = calcDamage({
         atkStat, defStat, movePower, moveType, defenderTypes,
         moveCategory: move["分類"],
@@ -299,15 +294,41 @@
       attackerName.textContent = attacker["名前"];
       defenderName.textContent = defender["名前"];
 
-      // 問題文生成
+      // 出題タイプを攻撃側/防御側の努力値・持ち物（4択のうちどれ）からランダム選択
+      const qTypes = ["atkEV", "atkItem", "defEV", "defItem"];
+      const ask = qTypes[Math.floor(Math.random() * qTypes.length)];
+
+      // 問題文（ダメージは常に表示）。ただし「問いになっている項目」は伏せる（？表記）
       let quizText = `${attacker["名前"]}（攻撃側）が「${move["技名"]}」（${moveType}タイプ）で、${defender["名前"]}（${defenderTypes.join("・")}, 防御側）を攻撃！\n`;
-      quizText += `ダメージ量: ${correctDamage}  攻撃側: 努力値${atkEV} / 持ち物${atkItem || "なし"}`;
-      quizText += askEV ? "\n防御側の努力値は？" : "\n防御側の持ち物は？";
+      quizText += `ダメージ量: ${correctDamage}\n`;
+
+      const atkEVText = (ask === 'atkEV') ? '？' : String(atkEV);
+      const atkItemText = (ask === 'atkItem') ? '？' : (atkItem || "なし");
+      const defEVText = (ask === 'defEV') ? '？' : String(defEV);
+      const defItemText = (ask === 'defItem') ? '？' : (defItem || "なし");
+
+      quizText += `攻撃側: 努力値 ${atkEVText} / 持ち物 ${atkItemText}\n`;
+      quizText += `防御側: 努力値 ${defEVText} / 持ち物 ${defItemText}\n`;
+
+      // 質問文
+      let questionLine = "";
+      if (ask === "atkEV") questionLine = "攻撃側の努力値は？";
+      if (ask === "atkItem") questionLine = "攻撃側の持ち物は？";
+      if (ask === "defEV") questionLine = "防御側の努力値は？";
+      if (ask === "defItem") questionLine = "防御側の持ち物は？";
+      quizText += questionLine;
+
       questionEl.textContent = quizText;
 
       // 選択肢生成
-      let choices = askEV ? defEVs : defItems;
-      choices = choices.map(v => v || "なし");
+      let choices = [];
+      if (ask === "atkEV" || ask === "defEV") {
+        choices = [0, 252].map(String);
+      } else if (ask === "atkItem") {
+        choices = atkItems.map(v => v || "なし");
+      } else if (ask === "defItem") {
+        choices = defItems.map(v => v || "なし");
+      }
       // シャッフル
       choices.sort(() => Math.random() - 0.5);
 
@@ -322,7 +343,10 @@
       resultEl.textContent = "";
 
       // 正解保存
-      window._quizCorrect = askEV ? String(defEV) : (defItem || "なし");
+      if (ask === "atkEV") window._quizCorrect = String(atkEV);
+      if (ask === "atkItem") window._quizCorrect = (atkItem || "なし");
+      if (ask === "defEV") window._quizCorrect = String(defEV);
+      if (ask === "defItem") window._quizCorrect = (defItem || "なし");
     }
 
     function checkAnswer(answer) {
