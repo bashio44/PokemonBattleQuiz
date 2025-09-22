@@ -47,10 +47,10 @@
     /* バトル領域：2x2 グリッド */
     .battle-grid {
       display: grid;
-      grid-template-columns: 1fr 140px;
+      grid-template-columns: 1fr 140px 180px; /* 左: info / 中央: icon / 右: name+HP */
       grid-template-rows: 140px 140px; /* 少し余白を増やし重なりを防止 */
       gap: 12px;
-      align-items: start;
+      align-items: center;
       position: relative;
       margin-bottom: 22px; /* 選択肢との重なりを防ぐために余白を増やす */
     }
@@ -72,26 +72,42 @@
       display:flex;
       justify-content:center;
       align-items:center;
+      transform: translateX(12px); /* 中央より右寄せ */
     }
-    .enemy-icon img { width:72px; height:72px; }
-    /* アイコンサイズ拡大 */
     .enemy-icon img { width:100px; height:100px; }
 
     /* 左下: 味方アイコンと情報（左下に移動） */
-    .ally-block {
-      grid-column: 1 / 2; /* 左下へ移動 */
+    .ally-info {
+      grid-column: 3 / 4; /* 右下 */
+      grid-row: 2 / 3;
+      text-align: right;
+      padding: 10px;
+      font-size: 14px;
+    }
+    .ally-icon-wrap {
+      grid-column: 2 / 3;
       grid-row: 2 / 3;
       display:flex;
-      gap:10px;
-      align-items:flex-start; /* 上寄せして選択肢と被らないように */
-      justify-content:flex-start;
-      flex-direction:row; /* アイコンと情報を横並び */
-      text-align:left;
-      padding: 10px;
+      justify-content:center;
+      align-items:center;
+      transform: translateX(-12px); /* 中央より左寄せ */
     }
-    .ally-block img { width:56px; height:56px; flex-shrink:0; }
-    .ally-block img { width:80px; height:80px; flex-shrink:0; }
-    .ally-info { font-size: 14px; }
+    .ally-icon-wrap img { width:100px; height:100px; }
+    .ally-namehp {
+      grid-column: 1 / 2;
+      grid-row: 2 / 3;
+      padding: 8px 10px;
+    }
+    .enemy-namehp {
+      grid-column: 3 / 4;
+      grid-row: 1 / 2;
+      padding: 8px 10px;
+      text-align: right;
+    }
+    .name-label { font-weight:700; margin-bottom:8px; }
+    .hp-wrap { width:100%; height:12px; background:#eee; border-radius:8px; overflow:hidden; }
+    .hp-bar { height:100%; background:#4caf50; width:100%; transition: width 700ms ease; }
+    .hp-text { font-size:13px; margin-top:6px; }
 
     /* spacer はそのまま保持（将来拡張用） */
     .spacer {
@@ -112,6 +128,8 @@
       justify-content:center;
     }
     .arrow-svg { width:100%; height:100%; overflow: visible; }
+    /* move label background */
+    .move-bg { fill: #ffe6d6; stroke: rgba(0,0,0,0.06); }
 
     /* 選択肢ボタン群 */
     #answers {
@@ -164,7 +182,6 @@
   <div class="quiz-container" role="main" aria-labelledby="question">
     <div class="battle-grid" id="battleGrid">
       <div class="enemy-info" id="enemyInfo">
-        <div id="enemyName">ポケモン名</div>
         <div id="enemyEV">努力値: ？？？</div>
         <div id="enemyNature">性格: ？？？</div>
         <div id="enemyItem">持ち物: ？？？</div>
@@ -174,16 +191,26 @@
         <img id="enemyIcon" src="" alt="敵ポケモン">
       </div>
 
-      <div class="spacer"></div>
+      <div class="enemy-namehp">
+        <div class="name-label" id="enemyName">ポケモン名</div>
+        <div class="hp-wrap"><div id="enemyHpBar" class="hp-bar"></div></div>
+        <div id="enemyHpText" class="hp-text">100%</div>
+      </div>
 
-      <div class="ally-block">
+      <div class="ally-namehp">
+        <div class="name-label" id="allyName">ポケモン名</div>
+        <div class="hp-wrap"><div id="allyHpBar" class="hp-bar"></div></div>
+        <div id="allyHpText" class="hp-text">100 / 100</div>
+      </div>
+
+      <div class="ally-icon-wrap">
         <img id="allyIcon" src="" alt="味方ポケモン">
-        <div class="ally-info" id="allyInfo">
-          <div id="allyName">ポケモン名</div>
-          <div id="allyEV">努力値: 0</div>
-          <div id="allyNature">性格: 無補正</div>
-          <div id="allyItem">持ち物: なし</div>
-        </div>
+      </div>
+
+      <div class="ally-info" id="allyInfo">
+        <div id="allyEV">努力値: 0</div>
+        <div id="allyNature">性格: 無補正</div>
+        <div id="allyItem">持ち物: なし</div>
       </div>
 
         <!-- 防御側HPバー表示領域 -->
@@ -202,7 +229,8 @@
             </marker>
           </defs>
           <line id="arrowLine" x1="0" y1="0" x2="0" y2="0" stroke="#333" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowHead)"></line>
-          <text id="moveLabel" x="50%" y="50%" text-anchor="middle" fill="#111" font-size="14" font-weight="700">技名</text>
+          <rect id="moveBg" x="0" y="0" rx="10" ry="10" width="180" height="36" class="move-bg"></rect>
+          <text id="moveLabel" x="50%" y="50%" text-anchor="middle" fill="#111" font-size="18" font-weight="700">技名</text>
         </svg>
       </div>
     </div>
@@ -307,6 +335,10 @@
   const defenderHpArea = document.getElementById("defenderHpArea");
   const defenderHpBar = document.getElementById("defenderHpBar");
   const defenderHpText = document.getElementById("defenderHpText");
+  const enemyHpBar = document.getElementById('enemyHpBar');
+  const enemyHpText = document.getElementById('enemyHpText');
+  const allyHpBar = document.getElementById('allyHpBar');
+  const allyHpText = document.getElementById('allyHpText');
 
     let correctAnswer = null;
     let score = 0;
@@ -396,24 +428,33 @@
         atkEV, defEV, atkNature, defNature, atkItem, defItem
       });
 
-      // 防御側のHPを表示（CSVのHP列を基に割合を計算）
-      const defenderBaseHP = Number((enemyIsAttacker ? ally : enemy)["HP"] || 100);
-      // 現在HPは満タンと仮定して、ダメージ後の割合を計算
-      const afterHp = Math.max(0, defenderBaseHP - correctDamage);
-      const afterRatio = Math.max(0, Math.min(1, afterHp / defenderBaseHP));
+      // 防御側（ダメージを受ける側）のHPを表示（CSVのHP列を基に割合を計算）
+      const targetIsAttacker = (attacker === (enemyIsAttacker ? enemy : ally));
+      const target = (attacker === (enemyIsAttacker ? enemy : ally)) ? attacker : defender;
+      const targetBaseHP = Number(target["HP"] || 100);
+      const afterHp = Math.max(0, targetBaseHP - correctDamage);
+      const afterRatio = Math.max(0, Math.min(1, afterHp / targetBaseHP));
 
-      // 表示領域を有効化し、バーとテキストを更新
-      if (defenderHpArea && defenderHpBar && defenderHpText) {
-        defenderHpArea.style.display = 'flex';
-        defenderHpBar.style.width = '100%';
-        defenderHpText.textContent = `${defenderBaseHP} / ${defenderBaseHP}`;
-        // アニメーションで減らすため少し遅延させる
-        setTimeout(() => {
-          defenderHpBar.style.transition = 'width 700ms ease';
-          defenderHpBar.style.width = `${Math.round(afterRatio * 100)}%`;
-          defenderHpText.textContent = `${Math.max(0, Math.round(afterHp))} / ${defenderBaseHP}`;
-        }, 200);
+      // 味方と敵それぞれのHPバーをリセット
+      if (enemyHpBar && allyHpBar) {
+        enemyHpBar.style.width = '100%';
+        allyHpBar.style.width = '100%';
+        enemyHpText.textContent = '100%';
+        allyHpText.textContent = `${targetBaseHP} / ${targetBaseHP}`;
       }
+
+      // ダメージは target に当たるので該当バーをアニメーションで減らす
+      setTimeout(() => {
+        if ( (enemyIsAttacker && attacker === enemy) || (!enemyIsAttacker && defender === enemy) ) {
+          // enemy が被ダメージ対象
+          if (enemyHpBar) enemyHpBar.style.width = `${Math.round(afterRatio * 100)}%`;
+          if (enemyHpText) enemyHpText.textContent = `${Math.round(afterRatio * 100)}%`;
+        } else {
+          // ally が被ダメージ対象
+          if (allyHpBar) allyHpBar.style.width = `${Math.round(afterRatio * 100)}%`;
+          if (allyHpText) allyHpText.textContent = `${Math.max(0, Math.round(afterHp))} / ${targetBaseHP}`;
+        }
+      }, 200);
 
       // 描画する情報（味方は全て表示、敵は不明箇所を ??? にする）
       const enemyEVVal = (enemyIsAttacker ? atkEV : defEV);
