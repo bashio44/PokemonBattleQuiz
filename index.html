@@ -187,8 +187,39 @@
       return eff;
     }
 
-    function calcDamage({atkStat, defStat, movePower, moveType, defenderTypes}) {
+    // 努力値・性格・持ち物補正を考慮したダメージ計算
+    // options: {atkStat, defStat, movePower, moveType, defenderTypes, atkEV, defEV, atkNature, defNature, atkItem, defItem}
+    function calcDamage({
+      atkStat, defStat, movePower, moveType, defenderTypes,
+      atkEV = 0, defEV = 0,
+      atkNature = 'neutral', defNature = 'neutral',
+      atkItem = '', defItem = ''
+    }) {
       const level = 50;
+      // 努力値反映（実数値計算の簡易版）
+      atkStat = Math.floor(atkStat + atkEV / 8);
+      defStat = Math.floor(defStat + defEV / 8);
+
+      // 性格補正
+      const natureTable = {
+        'up': 1.1, // 上昇
+        'down': 0.9, // 下降
+        'neutral': 1.0 // 無補正
+      };
+      atkStat = Math.floor(atkStat * (natureTable[atkNature] || 1.0));
+      defStat = Math.floor(defStat * (natureTable[defNature] || 1.0));
+
+      // 持ち物補正（攻撃側）
+      let atkItemBoost = 1.0;
+      if (atkItem === 'こだわりハチマキ' && move["分類"] === "物理") atkItemBoost = 1.5;
+      if (atkItem === 'こだわりメガネ' && move["分類"] === "特殊") atkItemBoost = 1.5;
+      atkStat = Math.floor(atkStat * atkItemBoost);
+
+      // 持ち物補正（防御側：突撃チョッキは特防1.5倍）
+      if (defItem === '突撃チョッキ' && move["分類"] === "特殊") {
+        defStat = Math.floor(defStat * 1.5);
+      }
+
       let base = (((2 * level / 5 + 2) * movePower * atkStat / defStat) / 50) + 2;
       const effectiveness = getTypeEffectiveness(moveType, defenderTypes);
       return Math.floor(base * effectiveness);
@@ -232,22 +263,34 @@
 
       // 技の分類で攻撃/特攻、防御/特防を選択
       let atkStat, defStat;
-      if (move["分類"] === "物理") {
-        atkStat = Number(attacker["攻撃"]);
-        defStat = Number(defender["防御"]);
-      } else {
-        atkStat = Number(attacker["特攻"]);
-        defStat = Number(defender["特防"]);
-      }
+      let statKeyAtk = move["分類"] === "物理" ? "攻撃" : "特攻";
+      let statKeyDef = move["分類"] === "物理" ? "防御" : "特防";
+      atkStat = Number(attacker[statKeyAtk]);
+      defStat = Number(defender[statKeyDef]);
       const movePower = Number(move["威力"]);
       const moveType = move["タイプ"];
-      // 防御側ポケモンのタイプ1・タイプ2
       const defenderTypes = [defender["タイプ1"] || "ノーマル", defender["タイプ2"]].filter(Boolean);
 
       // 威力0や空欄技はスキップ
       if (!movePower) return generateQuiz();
 
-      correctDamage = calcDamage({atkStat, defStat, movePower, moveType, defenderTypes});
+      // 片方の努力値・持ち物をランダム決定
+      const atkEV = [0, 252][Math.floor(Math.random()*2)];
+      const atkItem = ["", "こだわりハチマキ", "こだわりメガネ"][Math.floor(Math.random()*3)];
+      // 防御側の努力値・持ち物候補
+      const defEVs = [0, 252];
+  const defItems = ["", "突撃チョッキ"];
+
+      // 正解（防御側の努力値 or 持ち物）をランダムで選択
+      const askEV = Math.random() < 0.5;
+      const defEV = askEV ? defEVs[Math.floor(Math.random()*defEVs.length)] : 252;
+      const defItem = askEV ? "" : defItems[Math.floor(Math.random()*defItems.length)];
+
+      // ダメージ計算
+      correctDamage = calcDamage({
+        atkStat, defStat, movePower, moveType, defenderTypes,
+        atkEV, defEV, atkNature: 'neutral', defNature: 'neutral', atkItem, defItem
+      });
 
       // アイコン表示
       attackerIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(attacker["No"])}.png`;
@@ -256,17 +299,14 @@
       defenderName.textContent = defender["名前"];
 
       // 問題文生成
-      questionEl.textContent = `${attacker["名前"]}（攻撃側）が「${move["技名"]}」（${moveType}タイプ）で、${defender["名前"]}（${defenderTypes.join("・")}, 防御側）を攻撃！ダメージ量は？`;
+      let quizText = `${attacker["名前"]}（攻撃側）が「${move["技名"]}」（${moveType}タイプ）で、${defender["名前"]}（${defenderTypes.join("・")}, 防御側）を攻撃！\n`;
+      quizText += `ダメージ量: ${correctDamage}  攻撃側: 努力値${atkEV} / 持ち物${atkItem || "なし"}`;
+      quizText += askEV ? "\n防御側の努力値は？" : "\n防御側の持ち物は？";
+      questionEl.textContent = quizText;
 
-      // 選択肢生成（正解±10%の範囲で4択）
-      const choices = [];
-      choices.push(correctDamage);
-      for (let i = 0; i < 3; i++) {
-        let delta = Math.floor(correctDamage * (Math.random() * 0.2 - 0.1));
-        let val = correctDamage + delta;
-        if (val <= 0 || choices.includes(val)) val = correctDamage + (i+1)*5;
-        choices.push(val);
-      }
+      // 選択肢生成
+      let choices = askEV ? defEVs : defItems;
+      choices = choices.map(v => v || "なし");
       // シャッフル
       choices.sort(() => Math.random() - 0.5);
 
@@ -279,16 +319,19 @@
         answersEl.appendChild(btn);
       });
       resultEl.textContent = "";
+
+      // 正解保存
+      window._quizCorrect = askEV ? String(defEV) : (defItem || "なし");
     }
 
     function checkAnswer(answer) {
       total++;
-      if (Number(answer) === correctDamage) {
+      if (String(answer) === window._quizCorrect) {
         score++;
         resultEl.textContent = "✅ 正解！";
         resultEl.style.color = "green";
       } else {
-        resultEl.textContent = `❌ 不正解... 正解は ${correctDamage}`;
+        resultEl.textContent = `❌ 不正解... 正解は ${window._quizCorrect}`;
         resultEl.style.color = "red";
       }
       setTimeout(generateQuiz, 1200);
