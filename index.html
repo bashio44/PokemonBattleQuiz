@@ -367,6 +367,17 @@
       arrowLine.setAttribute('x2', x2);
       arrowLine.setAttribute('y2', y2);
       moveLabel.textContent = moveName;
+      // moveBg をテキスト幅に合わせる
+      try {
+        const bbox = moveLabel.getBBox();
+        const pad = 16;
+        const rect = document.getElementById('moveBg');
+        rect.setAttribute('width', Math.max(80, bbox.width + pad));
+        rect.setAttribute('x', bbox.x - pad/2);
+        rect.setAttribute('y', bbox.y - 8);
+      } catch (e) {
+        // getBBox が失敗する環境では無視
+      }
       // place moveLabel at midpoint
       const midX = (x1 + x2) / 2;
       const midY = (y1 + y2) / 2;
@@ -435,22 +446,22 @@
       const afterHp = Math.max(0, targetBaseHP - correctDamage);
       const afterRatio = Math.max(0, Math.min(1, afterHp / targetBaseHP));
 
-      // 味方と敵それぞれのHPバーをリセット
+      // 味方と敵それぞれのHPバーを同じ固定幅にリセット（見た目同サイズ）
       if (enemyHpBar && allyHpBar) {
         enemyHpBar.style.width = '100%';
         allyHpBar.style.width = '100%';
         enemyHpText.textContent = '100%';
-        allyHpText.textContent = `${targetBaseHP} / ${targetBaseHP}`;
+        allyHpText.textContent = `100 / 100`;
       }
 
       // ダメージは target に当たるので該当バーをアニメーションで減らす
       setTimeout(() => {
-        if ( (enemyIsAttacker && attacker === enemy) || (!enemyIsAttacker && defender === enemy) ) {
-          // enemy が被ダメージ対象
+        // 被ダメージ側が enemy か ally か判定して、それぞれのバーを減らす
+        const defenderIsEnemy = ( (enemyIsAttacker && attacker === enemy) || (!enemyIsAttacker && defender === enemy) );
+        if (defenderIsEnemy) {
           if (enemyHpBar) enemyHpBar.style.width = `${Math.round(afterRatio * 100)}%`;
           if (enemyHpText) enemyHpText.textContent = `${Math.round(afterRatio * 100)}%`;
         } else {
-          // ally が被ダメージ対象
           if (allyHpBar) allyHpBar.style.width = `${Math.round(afterRatio * 100)}%`;
           if (allyHpText) allyHpText.textContent = `${Math.max(0, Math.round(afterHp))} / ${targetBaseHP}`;
         }
