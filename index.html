@@ -188,9 +188,9 @@
     }
 
     // 努力値・性格・持ち物補正を考慮したダメージ計算
-    // options: {atkStat, defStat, movePower, moveType, defenderTypes, atkEV, defEV, atkNature, defNature, atkItem, defItem}
+    // options: {atkStat, defStat, movePower, moveType, defenderTypes, moveCategory, atkEV, defEV, atkNature, defNature, atkItem, defItem}
     function calcDamage({
-      atkStat, defStat, movePower, moveType, defenderTypes,
+      atkStat, defStat, movePower, moveType, defenderTypes, moveCategory = '物理',
       atkEV = 0, defEV = 0,
       atkNature = 'neutral', defNature = 'neutral',
       atkItem = '', defItem = ''
@@ -211,12 +211,12 @@
 
       // 持ち物補正（攻撃側）
       let atkItemBoost = 1.0;
-      if (atkItem === 'こだわりハチマキ' && move["分類"] === "物理") atkItemBoost = 1.5;
-      if (atkItem === 'こだわりメガネ' && move["分類"] === "特殊") atkItemBoost = 1.5;
+      if (atkItem === 'こだわりハチマキ' && moveCategory === "物理") atkItemBoost = 1.5;
+      if (atkItem === 'こだわりメガネ' && moveCategory === "特殊") atkItemBoost = 1.5;
       atkStat = Math.floor(atkStat * atkItemBoost);
 
       // 持ち物補正（防御側：突撃チョッキは特防1.5倍）
-      if (defItem === '突撃チョッキ' && move["分類"] === "特殊") {
+      if (defItem === '突撃チョッキ' && moveCategory === "特殊") {
         defStat = Math.floor(defStat * 1.5);
       }
 
@@ -289,6 +289,7 @@
       // ダメージ計算
       correctDamage = calcDamage({
         atkStat, defStat, movePower, moveType, defenderTypes,
+        moveCategory: move["分類"],
         atkEV, defEV, atkNature: 'neutral', defNature: 'neutral', atkItem, defItem
       });
 
