@@ -6,7 +6,7 @@
   <title>ポケモン対戦クイズ</title>
   <style>
     :root{
-      --bg: #f8f9fa;
+      --bg: #fff7f0; /* やわらかい背景色に変更 */
       --card: #ffffff;
       --primary: #007bff;
       --primary-dark: #0056b3;
@@ -141,6 +141,16 @@
     button:active { transform: translateY(1px) scale(0.997); }
     button:focus { outline: 3px solid rgba(0,123,255,0.18); outline-offset: 2px; }
 
+    /* 白文字用の黒背景ボックス（可読性向上） */
+    .wb {
+      background: #000;
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 6px;
+      display: inline-block;
+      line-height: 1;
+    }
+
     #result {
       margin-top: 10px;
       font-weight: 700;
@@ -155,12 +165,7 @@
       .battle-grid { grid-template-columns: 1fr 160px; grid-template-rows: 160px 160px; }
     }
 
-    @media (prefers-color-scheme: dark) {
-      :root { --bg: #0f1720; --card: #0b1220; --primary: #3b82f6; --primary-dark: #2563eb; }
-      body { color: #e6eef8; }
-      .quiz-container { box-shadow: 0 6px 24px rgba(0,0,0,0.6); }
-      button { box-shadow: none; }
-    }
+    /* ダークモード配慮は不要のため削除しました */
   </style>
 </head>
 <body>
@@ -438,9 +443,13 @@
       answersEl.innerHTML = "";
       choices.forEach(answer => {
         const btn = document.createElement("button");
-        btn.textContent = answer;
-        btn.onclick = () => checkAnswer(answer);
         btn.type = "button";
+        // 白文字部分に黒い背景ボックスを付けるため span を内包
+        const span = document.createElement("span");
+        span.className = "wb";
+        span.textContent = answer;
+        btn.appendChild(span);
+        btn.onclick = () => checkAnswer(answer);
         answersEl.appendChild(btn);
       });
       resultEl.textContent = "";
