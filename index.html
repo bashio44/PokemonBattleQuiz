@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1"> <!-- 追加 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ポケモン対戦クイズ</title>
   <style>
     :root{
@@ -13,8 +13,6 @@
       --radius: 12px;
       --gap: 12px;
     }
-
-    /* ページ全体 */
     html, body {
       height: 100%;
       margin: 0;
@@ -31,37 +29,93 @@
       padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
       min-height: 100vh;
     }
-
-    /* クイズカード */
     .quiz-container {
       background: var(--card);
       padding: clamp(16px, 3.5vw, 28px);
       border-radius: var(--radius);
       box-shadow: 0 6px 18px rgba(10,10,20,0.08);
-      width: min(92vw, 560px);
+      width: min(92vw, 640px);
       max-width: 95%;
-      text-align: center;
       transition: transform 180ms ease;
+      position: relative;
     }
     .quiz-container:focus-within,
     .quiz-container:hover {
       transform: translateY(-4px);
     }
 
-    h2 {
-      margin: 0 0 14px 0;
-      font-size: clamp(18px, 3.6vw, 22px);
-      line-height: 1.3;
+    /* バトル領域：2x2 グリッド */
+    .battle-grid {
+      display: grid;
+      grid-template-columns: 1fr 140px;
+      grid-template-rows: 120px 120px;
+      gap: 8px;
+      align-items: start;
+      position: relative;
+      margin-bottom: 12px;
     }
 
-    /* 答えボタン群をグリッドで整列 */
+    /* 左上: 敵の情報（情報を左上に） */
+    .enemy-info {
+      grid-column: 1 / 2;
+      grid-row: 1 / 2;
+      text-align: left;
+      padding: 10px;
+      font-size: 14px;
+    }
+    .enemy-info .label { font-weight: 700; margin-bottom: 6px; display:block; }
+
+    /* 右上: 敵アイコン */
+    .enemy-icon {
+      grid-column: 2 / 3;
+      grid-row: 1 / 2;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+    }
+    .enemy-icon img { width:72px; height:72px; }
+
+    /* 左下: 空白（将来拡張用） */
+    .spacer {
+      grid-column: 1 / 2;
+      grid-row: 2 / 3;
+    }
+
+    /* 右下: 味方アイコンと情報（同じセルに配置） */
+    .ally-block {
+      grid-column: 2 / 3;
+      grid-row: 2 / 3;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:center;
+      flex-direction:column;
+      text-align:center;
+    }
+    .ally-block img { width:72px; height:72px; }
+    .ally-info { font-size: 14px; }
+
+    /* 矢印と技名を重ねるローカルSVG */
+    .arrow-layer {
+      position:absolute;
+      right: 0; /* icons are on right column */
+      top: 0;
+      bottom: 0;
+      width: 140px;
+      pointer-events: none;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .arrow-svg { width:100%; height:100%; }
+
+    /* 選択肢ボタン群 */
     #answers {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
       gap: var(--gap);
       margin-top: 6px;
     }
-
     button {
       display: inline-flex;
       align-items: center;
@@ -77,39 +131,26 @@
       transition: background 120ms ease, transform 80ms ease;
       box-shadow: 0 2px 6px rgba(0,0,0,0.06);
       width: 100%;
-      min-height: 44px; /* タップターゲット確保 */
+      min-height: 44px;
     }
-    button:hover {
-      background: var(--primary-dark);
-    }
-    button:active {
-      transform: translateY(1px) scale(0.997);
-    }
-    button:focus {
-      outline: 3px solid rgba(0,123,255,0.18);
-      outline-offset: 2px;
-    }
+    button:hover { background: var(--primary-dark); }
+    button:active { transform: translateY(1px) scale(0.997); }
+    button:focus { outline: 3px solid rgba(0,123,255,0.18); outline-offset: 2px; }
 
     #result {
-      margin-top: 14px;
+      margin-top: 10px;
       font-weight: 700;
       font-size: 15px;
       min-height: 1.2em;
       transition: color 120ms ease;
+      text-align:center;
     }
 
-    /* PC向け微調整 */
     @media (min-width: 900px) {
-      .quiz-container {
-        width: 420px;
-        padding: 28px;
-      }
-      #answers {
-        gap: 14px;
-      }
+      .quiz-container { width: 640px; padding: 28px; }
+      .battle-grid { grid-template-columns: 1fr 160px; grid-template-rows: 140px 140px; }
     }
 
-    /* ダークモードサポート（任意） */
     @media (prefers-color-scheme: dark) {
       :root { --bg: #0f1720; --card: #0b1220; --primary: #3b82f6; --primary-dark: #2563eb; }
       body { color: #e6eef8; }
@@ -120,23 +161,51 @@
 </head>
 <body>
   <div class="quiz-container" role="main" aria-labelledby="question">
-    <div style="display:flex; justify-content:center; align-items:center; gap:24px; margin-bottom:10px;">
-      <div>
-        <img id="attackerIcon" src="" alt="攻撃側ポケモン" width="72" height="72"><br>
-        <span id="attackerName"></span>
+    <div class="battle-grid" id="battleGrid">
+      <div class="enemy-info" id="enemyInfo">
+        <span class="label">敵</span>
+        <div id="enemyName">ポケモン名</div>
+        <div id="enemyEV">努力値: ？？？</div>
+        <div id="enemyNature">性格: ？？？</div>
+        <div id="enemyItem">持ち物: ？？？</div>
       </div>
-      <div>
-        <img id="defenderIcon" src="" alt="防御側ポケモン" width="72" height="72"><br>
-        <span id="defenderName"></span>
+
+      <div class="enemy-icon" id="enemyIconWrap">
+        <img id="enemyIcon" src="" alt="敵ポケモン">
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="ally-block">
+        <img id="allyIcon" src="" alt="味方ポケモン">
+        <div class="ally-info" id="allyInfo">
+          <div id="allyName">ポケモン名</div>
+          <div id="allyEV">努力値: 0</div>
+          <div id="allyNature">性格: 無補正</div>
+          <div id="allyItem">持ち物: なし</div>
+        </div>
+      </div>
+
+      <div class="arrow-layer" aria-hidden="true">
+        <svg class="arrow-svg" id="arrowSvg">
+          <defs>
+            <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L8,4 L0,8 z" fill="#333"></path>
+            </marker>
+          </defs>
+          <line id="arrowLine" x1="0" y1="0" x2="0" y2="0" stroke="#333" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowHead)"></line>
+          <text id="moveLabel" x="50%" y="50%" text-anchor="middle" fill="#111" font-size="14" font-weight="700">技名</text>
+        </svg>
       </div>
     </div>
-    <h2 id="question">問題がここに表示されます</h2>
+
+    <!-- 問題文は不要なので削除 -->
     <div id="answers" aria-live="polite"></div>
     <p id="result" aria-atomic="true"></p>
   </div>
 
   <script>
-    // 1. CSVデータ読み込み
+    // CSV読み込み
     async function loadCSV(url) {
       const res = await fetch(url);
       const text = await res.text();
@@ -150,8 +219,6 @@
       });
     }
 
-    // 全タイプ対応のタイプ相性表（攻撃技タイプ→防御ポケモンタイプ）
-    // 公式準拠（抜粋・主要タイプのみ記載、必要に応じて拡張）
     const typeChart = {
       'ノーマル':   { 'いわ': 0.5, 'ゴースト': 0, 'はがね': 0.5 },
       'ほのお':     { 'くさ': 2, 'みず': 0.5, 'ほのお': 0.5, 'こおり': 2, 'むし': 2, 'いわ': 0.5, 'ドラゴン': 0.5, 'はがね': 2 },
@@ -173,7 +240,6 @@
       'フェアリー': { 'かくとう': 2, 'どく': 0.5, 'はがね': 0.5, 'ドラゴン': 2, 'あく': 2, 'フェアリー': 1 },
     };
 
-    // 2. ダメージ計算式（複数タイプ対応）
     function getTypeEffectiveness(moveType, defenderTypes) {
       let eff = 1;
       defenderTypes.forEach(type => {
@@ -187,8 +253,6 @@
       return eff;
     }
 
-    // 努力値・性格・持ち物補正を考慮したダメージ計算
-    // options: {atkStat, defStat, movePower, moveType, defenderTypes, moveCategory, atkEV, defEV, atkNature, defNature, atkItem, defItem}
     function calcDamage({
       atkStat, defStat, movePower, moveType, defenderTypes, moveCategory = '物理',
       atkEV = 0, defEV = 0,
@@ -196,72 +260,84 @@
       atkItem = '', defItem = ''
     }) {
       const level = 50;
-      // 努力値反映（実数値計算の簡易版）
       atkStat = Math.floor(atkStat + atkEV / 8);
       defStat = Math.floor(defStat + defEV / 8);
-
-      // 性格補正
-      const natureTable = {
-        'up': 1.1, // 上昇
-        'down': 0.9, // 下降
-        'neutral': 1.0 // 無補正
-      };
+      const natureTable = { 'up': 1.1, 'down': 0.9, 'neutral': 1.0 };
       atkStat = Math.floor(atkStat * (natureTable[atkNature] || 1.0));
       defStat = Math.floor(defStat * (natureTable[defNature] || 1.0));
-
-      // 持ち物補正（攻撃側）
       let atkItemBoost = 1.0;
       if (atkItem === 'こだわりハチマキ' && moveCategory === "物理") atkItemBoost = 1.5;
       if (atkItem === 'こだわりメガネ' && moveCategory === "特殊") atkItemBoost = 1.5;
       atkStat = Math.floor(atkStat * atkItemBoost);
-
-      // 持ち物補正（防御側：突撃チョッキは特防1.5倍）
       if (defItem === '突撃チョッキ' && moveCategory === "特殊") {
         defStat = Math.floor(defStat * 1.5);
       }
-
       let base = (((2 * level / 5 + 2) * movePower * atkStat / defStat) / 50) + 2;
       const effectiveness = getTypeEffectiveness(moveType, defenderTypes);
       return Math.floor(base * effectiveness);
     }
 
-    // 例: stats/movesの読み込み
     let pokemonStats = [];
     let pokemonMoves = [];
-    Promise.all([
-      loadCSV('pokemon_stats.csv'),
-      loadCSV('pokemon_moves.csv')
-    ]).then(([stats, moves]) => {
-      pokemonStats = stats;
-      pokemonMoves = moves;
-      // ここでクイズ出題やUI拡張が可能
-      // 例: console.log(pokemonStats, pokemonMoves);
-    });
 
-    // クイズ：攻撃側ポケモン・技・防御側ポケモンをランダム表示し、ダメージ量を答える
-  const questionEl = document.getElementById("question");
-  const answersEl = document.getElementById("answers");
-  const resultEl = document.getElementById("result");
-  const attackerIcon = document.getElementById("attackerIcon");
-  const defenderIcon = document.getElementById("defenderIcon");
-  const attackerName = document.getElementById("attackerName");
-  const defenderName = document.getElementById("defenderName");
+    const questionEl = null; // 問題文不要のため null
+    const answersEl = document.getElementById("answers");
+    const resultEl = document.getElementById("result");
+    const enemyIcon = document.getElementById("enemyIcon");
+    const allyIcon = document.getElementById("allyIcon");
+    const enemyNameEl = document.getElementById("enemyName");
+    const enemyEVElem = document.getElementById("enemyEV");
+    const enemyNatureEl = document.getElementById("enemyNature");
+    const enemyItemEl = document.getElementById("enemyItem");
+    const allyNameEl = document.getElementById("allyName");
+    const allyEVElem = document.getElementById("allyEV");
+    const allyNatureEl = document.getElementById("allyNature");
+    const allyItemEl = document.getElementById("allyItem");
+    const moveLabel = document.getElementById("moveLabel");
+    const arrowLine = document.getElementById("arrowLine");
+    const arrowSvg = document.getElementById("arrowSvg");
 
-    let correctDamage = null;
+    let correctAnswer = null;
     let score = 0;
     let total = 0;
 
-    function getRandom(arr) {
-      return arr[Math.floor(Math.random() * arr.length)];
+    function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    function drawArrow(fromEl, toEl, moveName) {
+      if (!fromEl || !toEl) return;
+      // SVG coordinates relative to svg bbox
+      const svgRect = arrowSvg.getBoundingClientRect();
+      const aRect = fromEl.getBoundingClientRect();
+      const bRect = toEl.getBoundingClientRect();
+      const x1 = aRect.left + aRect.width / 2 - svgRect.left;
+      const y1 = aRect.top + aRect.height / 2 - svgRect.top;
+      const x2 = bRect.left + bRect.width / 2 - svgRect.left;
+      const y2 = bRect.top + bRect.height / 2 - svgRect.top;
+      arrowLine.setAttribute('x1', x1);
+      arrowLine.setAttribute('y1', y1);
+      arrowLine.setAttribute('x2', x2);
+      arrowLine.setAttribute('y2', y2);
+      moveLabel.textContent = moveName;
+      // place moveLabel at midpoint
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+      moveLabel.setAttribute('x', midX);
+      moveLabel.setAttribute('y', midY - 8); // 少し上に寄せる
+    }
+
+    function jpNatureLabel(n) {
+      if (n === 'neutral') return '無補正';
+      if (n === 'up') return '上昇';
+      if (n === 'down') return '下降';
+      return '無補正';
     }
 
     function generateQuiz() {
-      // 攻撃側・防御側ポケモン、技をランダム選択
+      if (!pokemonStats.length || !pokemonMoves.length) return;
       const attacker = getRandom(pokemonStats);
       const defender = getRandom(pokemonStats);
       const move = getRandom(pokemonMoves);
 
-      // 技の分類で攻撃/特攻、防御/特防を選択
       let statKeyAtk = move["分類"] === "物理" ? "攻撃" : "特攻";
       let statKeyDef = move["分類"] === "物理" ? "防御" : "特防";
       const atkStat = Number(attacker[statKeyAtk]);
@@ -270,10 +346,12 @@
       const moveType = move["タイプ"];
       const defenderTypes = [defender["タイプ1"] || "ノーマル", defender["タイプ2"]].filter(Boolean);
 
-      // 威力0や空欄技はスキップ
       if (!movePower) return generateQuiz();
 
-      // 両者の努力値・持ち物をランダム決定（クイズの対象がどちらかは後で選ぶ）
+      // ランダム性格（簡易）と努力値・持ち物
+      const natures = ['neutral','up','down'];
+      const atkNature = getRandom(natures);
+      const defNature = getRandom(natures);
       const atkEV = [0, 252][Math.floor(Math.random() * 2)];
       const defEV = [0, 252][Math.floor(Math.random() * 2)];
       const atkItems = ["", "こだわりハチマキ", "こだわりメガネ"];
@@ -281,55 +359,63 @@
       const atkItem = atkItems[Math.floor(Math.random() * atkItems.length)];
       const defItem = defItems[Math.floor(Math.random() * defItems.length)];
 
-      // ダメージ計算（実際の値で算出）
-      correctDamage = calcDamage({
-        atkStat, defStat, movePower, moveType, defenderTypes,
-        moveCategory: move["分類"],
-        atkEV, defEV, atkNature: 'neutral', defNature: 'neutral', atkItem, defItem
-      });
-
-      // アイコン表示
-      attackerIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(attacker["No"])}.png`;
-      defenderIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(defender["No"])}.png`;
-      attackerName.textContent = attacker["名前"];
-      defenderName.textContent = defender["名前"];
-
-      // 出題タイプを攻撃側/防御側の努力値・持ち物（4択のうちどれ）からランダム選択
+      // 出題項目 (敵=当てる対象)
       const qTypes = ["atkEV", "atkItem", "defEV", "defItem"];
       const ask = qTypes[Math.floor(Math.random() * qTypes.length)];
 
-      // 問題文（ダメージは常に表示）。ただし「問いになっている項目」は伏せる（？表記）
-      let quizText = `${attacker["名前"]}（攻撃側）が「${move["技名"]}」（${moveType}タイプ）で、${defender["名前"]}（${defenderTypes.join("・")}, 防御側）を攻撃！\n`;
-      quizText += `ダメージ量: ${correctDamage}\n`;
+      // 敵は「当てる対象」。ask が atk系なら attacker が敵、それ以外は defender が敵。
+      const enemyIsAttacker = (ask === 'atkEV' || ask === 'atkItem');
+      const enemy = enemyIsAttacker ? attacker : defender;
+      const ally = enemyIsAttacker ? defender : attacker;
 
-      const atkEVText = (ask === 'atkEV') ? '？' : String(atkEV);
-      const atkItemText = (ask === 'atkItem') ? '？' : (atkItem || "なし");
-      const defEVText = (ask === 'defEV') ? '？' : String(defEV);
-      const defItemText = (ask === 'defItem') ? '？' : (defItem || "なし");
+      // 表示用アイコン（配置は固定：敵＝右上、味方＝右下）
+      enemyIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(enemy["No"])}.png`;
+      allyIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(ally["No"])}.png`;
 
-      quizText += `攻撃側: 努力値 ${atkEVText} / 持ち物 ${atkItemText}\n`;
-      quizText += `防御側: 努力値 ${defEVText} / 持ち物 ${defItemText}\n`;
+      // 正しい値計算（ダメージは内部で使うが問題文不要なので表示しない）
+      correctDamage = calcDamage({
+        atkStat, defStat, movePower, moveType, defenderTypes,
+        moveCategory: move["分類"],
+        atkEV, defEV, atkNature, defNature, atkItem, defItem
+      });
 
-      // 質問文
-      let questionLine = "";
-      if (ask === "atkEV") questionLine = "攻撃側の努力値は？";
-      if (ask === "atkItem") questionLine = "攻撃側の持ち物は？";
-      if (ask === "defEV") questionLine = "防御側の努力値は？";
-      if (ask === "defItem") questionLine = "防御側の持ち物は？";
-      quizText += questionLine;
+      // 描画する情報（味方は全て表示、敵は不明箇所を ??? にする）
+      // 敵側の値取得
+      const enemyEVVal = (enemyIsAttacker ? atkEV : defEV);
+      const enemyItemVal = (enemyIsAttacker ? atkItem : defItem);
+      const enemyNatureVal = (enemyIsAttacker ? atkNature : defNature);
 
-      questionEl.textContent = quizText;
+      const allyEVVal = (enemyIsAttacker ? defEV : atkEV);
+      const allyItemVal = (enemyIsAttacker ? defItem : atkItem);
+      const allyNatureVal = (enemyIsAttacker ? defNature : atkNature);
 
-      // 選択肢生成
+      // 表示：敵（左上）
+      enemyNameEl.textContent = enemy["名前"];
+      enemyEVElem.textContent = '努力値: ' + ((ask === 'atkEV' && enemyIsAttacker) || (ask === 'defEV' && !enemyIsAttacker) ? '？？？' : String(enemyEVVal));
+      enemyNatureEl.textContent = '性格: ' + jpNatureLabel(enemyNatureVal);
+      enemyItemEl.textContent = '持ち物: ' + ((ask === 'atkItem' && enemyIsAttacker) || (ask === 'defItem' && !enemyIsAttacker) ? '？？？' : (enemyItemVal || 'なし'));
+
+      // 表示：味方（右下）
+      allyNameEl.textContent = ally["名前"];
+      allyEVElem.textContent = '努力値: ' + String(allyEVVal);
+      allyNatureEl.textContent = '性格: ' + jpNatureLabel(allyNatureVal);
+      allyItemEl.textContent = '持ち物: ' + (allyItemVal || 'なし');
+
+      // moveLabel を技名にセット（矢印に重ねる）
+      moveLabel.textContent = move["技名"];
+
+      // 選択肢と正誤設定（敵の不明箇所を当てる）
       let choices = [];
       if (ask === "atkEV" || ask === "defEV") {
         choices = [0, 252].map(String);
+        correctAnswer = String(enemyEVVal);
       } else if (ask === "atkItem") {
         choices = atkItems.map(v => v || "なし");
+        correctAnswer = (enemyItemVal || "なし");
       } else if (ask === "defItem") {
         choices = defItems.map(v => v || "なし");
+        correctAnswer = (enemyItemVal || "なし");
       }
-      // シャッフル
       choices.sort(() => Math.random() - 0.5);
 
       answersEl.innerHTML = "";
@@ -342,27 +428,34 @@
       });
       resultEl.textContent = "";
 
-      // 正解保存
-      if (ask === "atkEV") window._quizCorrect = String(atkEV);
-      if (ask === "atkItem") window._quizCorrect = (atkItem || "なし");
-      if (ask === "defEV") window._quizCorrect = String(defEV);
-      if (ask === "defItem") window._quizCorrect = (defItem || "なし");
+      // 矢印を描く（画像読み込み後に実行）
+      const fromEl = (attacker === enemy) ? document.getElementById('enemyIcon') : document.getElementById('allyIcon');
+      const toEl = (defender === enemy) ? document.getElementById('enemyIcon') : document.getElementById('allyIcon');
+
+      // 画像の onload で再描画して位置を確実に取得
+      function redraw() {
+        drawArrow(fromEl, toEl, move["技名"]);
+      }
+      // try immediate and also bind onload
+      setTimeout(redraw, 80);
+      enemyIcon.onload = redraw;
+      allyIcon.onload = redraw;
     }
 
     function checkAnswer(answer) {
       total++;
-      if (String(answer) === window._quizCorrect) {
+      if (String(answer) === String(correctAnswer)) {
         score++;
         resultEl.textContent = "✅ 正解！";
         resultEl.style.color = "green";
       } else {
-        resultEl.textContent = `❌ 不正解... 正解は ${window._quizCorrect}`;
+        resultEl.textContent = `❌ 不正解... 正解は ${correctAnswer}`;
         resultEl.style.color = "red";
       }
       setTimeout(generateQuiz, 1200);
     }
 
-    // stats/movesロード後にクイズ開始
+    // CSVロード後にクイズ開始
     Promise.all([
       loadCSV('pokemon_stats.csv'),
       loadCSV('pokemon_moves.csv')
@@ -370,7 +463,10 @@
       pokemonStats = stats;
       pokemonMoves = moves;
       generateQuiz();
+    }).catch(err => {
+      console.error(err);
     });
+
   </script>
 </body>
 </html>
