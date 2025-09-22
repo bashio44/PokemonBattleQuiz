@@ -74,6 +74,8 @@
       align-items:center;
     }
     .enemy-icon img { width:72px; height:72px; }
+    /* アイコンサイズ拡大 */
+    .enemy-icon img { width:100px; height:100px; }
 
     /* 左下: 味方アイコンと情報（左下に移動） */
     .ally-block {
@@ -88,6 +90,7 @@
       padding: 10px;
     }
     .ally-block img { width:56px; height:56px; flex-shrink:0; }
+    .ally-block img { width:80px; height:80px; flex-shrink:0; }
     .ally-info { font-size: 14px; }
 
     /* spacer はそのまま保持（将来拡張用） */
@@ -318,10 +321,16 @@
       const svgRect = arrowSvg.getBoundingClientRect();
       const aRect = fromEl.getBoundingClientRect();
       const bRect = toEl.getBoundingClientRect();
-      const x1 = aRect.left + aRect.width / 2 - svgRect.left;
-      const y1 = aRect.top + aRect.height / 2 - svgRect.top;
-      const x2 = bRect.left + bRect.width / 2 - svgRect.left;
-      const y2 = bRect.top + bRect.height / 2 - svgRect.top;
+        // アイコンの中心から少し外側にずらす（被り防止）
+        const offset = 48; // アイコン半径+α
+        // from: アイコンの中心からto方向にoffsetだけ離す
+        const dx = bRect.left + bRect.width / 2 - (aRect.left + aRect.width / 2);
+        const dy = bRect.top + bRect.height / 2 - (aRect.top + aRect.height / 2);
+        const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+        const x1 = aRect.left + aRect.width / 2 - svgRect.left + (dx/dist)*offset;
+        const y1 = aRect.top + aRect.height / 2 - svgRect.top + (dy/dist)*offset;
+        const x2 = bRect.left + bRect.width / 2 - svgRect.left - (dx/dist)*offset;
+        const y2 = bRect.top + bRect.height / 2 - svgRect.top - (dy/dist)*offset;
       arrowLine.setAttribute('x1', x1);
       arrowLine.setAttribute('y1', y1);
       arrowLine.setAttribute('x2', x2);
