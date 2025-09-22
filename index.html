@@ -141,15 +141,7 @@
     button:active { transform: translateY(1px) scale(0.997); }
     button:focus { outline: 3px solid rgba(0,123,255,0.18); outline-offset: 2px; }
 
-    /* 白文字用の黒背景ボックス（可読性向上） */
-    .wb {
-      background: #000;
-      color: #fff;
-      padding: 4px 8px;
-      border-radius: 6px;
-      display: inline-block;
-      line-height: 1;
-    }
+    /* ...existing code... */
 
     #result {
       margin-top: 10px;
@@ -172,7 +164,6 @@
   <div class="quiz-container" role="main" aria-labelledby="question">
     <div class="battle-grid" id="battleGrid">
       <div class="enemy-info" id="enemyInfo">
-        <span class="label">敵</span>
         <div id="enemyName">ポケモン名</div>
         <div id="enemyEV">努力値: ？？？</div>
         <div id="enemyNature">性格: ？？？</div>
@@ -444,11 +435,7 @@
       choices.forEach(answer => {
         const btn = document.createElement("button");
         btn.type = "button";
-        // 白文字部分に黒い背景ボックスを付けるため span を内包
-        const span = document.createElement("span");
-        span.className = "wb";
-        span.textContent = answer;
-        btn.appendChild(span);
+        btn.textContent = answer;
         btn.onclick = () => checkAnswer(answer);
         answersEl.appendChild(btn);
       });
