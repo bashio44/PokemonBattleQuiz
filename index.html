@@ -48,11 +48,11 @@
     .battle-grid {
       display: grid;
       grid-template-columns: 1fr 140px;
-      grid-template-rows: 120px 120px;
-      gap: 8px;
+      grid-template-rows: 140px 140px; /* 少し余白を増やし重なりを防止 */
+      gap: 12px;
       align-items: start;
       position: relative;
-      margin-bottom: 12px;
+      margin-bottom: 22px; /* 選択肢との重なりを防ぐために余白を増やす */
     }
 
     /* 左上: 敵の情報（情報を左上に） */
@@ -75,46 +75,47 @@
     }
     .enemy-icon img { width:72px; height:72px; }
 
-    /* 左下: 空白（将来拡張用） */
-    .spacer {
-      grid-column: 1 / 2;
-      grid-row: 2 / 3;
-    }
-
-    /* 右下: 味方アイコンと情報（同じセルに配置） */
+    /* 左下: 味方アイコンと情報（左下に移動） */
     .ally-block {
-      grid-column: 2 / 3;
+      grid-column: 1 / 2; /* 左下へ移動 */
       grid-row: 2 / 3;
       display:flex;
       gap:10px;
-      align-items:center;
-      justify-content:center;
-      flex-direction:column;
-      text-align:center;
+      align-items:flex-start; /* 上寄せして選択肢と被らないように */
+      justify-content:flex-start;
+      flex-direction:row; /* アイコンと情報を横並び */
+      text-align:left;
+      padding: 10px;
     }
-    .ally-block img { width:72px; height:72px; }
+    .ally-block img { width:56px; height:56px; flex-shrink:0; }
     .ally-info { font-size: 14px; }
 
-    /* 矢印と技名を重ねるローカルSVG */
+    /* spacer はそのまま保持（将来拡張用） */
+    .spacer {
+      grid-column: 2 / 3;
+      grid-row: 2 / 3;
+    }
+
+    /* 矢印と技名を重ねるローカルSVG（バトル領域全体を覆う） */
     .arrow-layer {
       position:absolute;
-      right: 0; /* icons are on right column */
+      left: 0;
+      right: 0;
       top: 0;
       bottom: 0;
-      width: 140px;
       pointer-events: none;
       display:flex;
       align-items:center;
       justify-content:center;
     }
-    .arrow-svg { width:100%; height:100%; }
+    .arrow-svg { width:100%; height:100%; overflow: visible; }
 
     /* 選択肢ボタン群 */
     #answers {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
       gap: var(--gap);
-      margin-top: 6px;
+      margin-top: 12px; /* 余白を増やす */
     }
     button {
       display: inline-flex;
@@ -148,7 +149,7 @@
 
     @media (min-width: 900px) {
       .quiz-container { width: 640px; padding: 28px; }
-      .battle-grid { grid-template-columns: 1fr 160px; grid-template-rows: 140px 140px; }
+      .battle-grid { grid-template-columns: 1fr 160px; grid-template-rows: 160px 160px; }
     }
 
     @media (prefers-color-scheme: dark) {
@@ -368,11 +369,11 @@
       const enemy = enemyIsAttacker ? attacker : defender;
       const ally = enemyIsAttacker ? defender : attacker;
 
-      // 表示用アイコン（配置は固定：敵＝右上、味方＝右下）
+      // 表示用アイコン（固定配置：敵＝右上、味方＝左下）
       enemyIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(enemy["No"])}.png`;
       allyIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(ally["No"])}.png`;
 
-      // 正しい値計算（ダメージは内部で使うが問題文不要なので表示しない）
+      // 正しい値計算（ダメージは内部で使うが表示しない）
       correctDamage = calcDamage({
         atkStat, defStat, movePower, moveType, defenderTypes,
         moveCategory: move["分類"],
@@ -380,7 +381,6 @@
       });
 
       // 描画する情報（味方は全て表示、敵は不明箇所を ??? にする）
-      // 敵側の値取得
       const enemyEVVal = (enemyIsAttacker ? atkEV : defEV);
       const enemyItemVal = (enemyIsAttacker ? atkItem : defItem);
       const enemyNatureVal = (enemyIsAttacker ? atkNature : defNature);
@@ -389,13 +389,13 @@
       const allyItemVal = (enemyIsAttacker ? defItem : atkItem);
       const allyNatureVal = (enemyIsAttacker ? defNature : atkNature);
 
-      // 表示：敵（左上）
+      // 表示：敵（左上情報、右上アイコン）
       enemyNameEl.textContent = enemy["名前"];
       enemyEVElem.textContent = '努力値: ' + ((ask === 'atkEV' && enemyIsAttacker) || (ask === 'defEV' && !enemyIsAttacker) ? '？？？' : String(enemyEVVal));
       enemyNatureEl.textContent = '性格: ' + jpNatureLabel(enemyNatureVal);
       enemyItemEl.textContent = '持ち物: ' + ((ask === 'atkItem' && enemyIsAttacker) || (ask === 'defItem' && !enemyIsAttacker) ? '？？？' : (enemyItemVal || 'なし'));
 
-      // 表示：味方（右下）
+      // 表示：味方（左下）
       allyNameEl.textContent = ally["名前"];
       allyEVElem.textContent = '努力値: ' + String(allyEVVal);
       allyNatureEl.textContent = '性格: ' + jpNatureLabel(allyNatureVal);
@@ -432,11 +432,9 @@
       const fromEl = (attacker === enemy) ? document.getElementById('enemyIcon') : document.getElementById('allyIcon');
       const toEl = (defender === enemy) ? document.getElementById('enemyIcon') : document.getElementById('allyIcon');
 
-      // 画像の onload で再描画して位置を確実に取得
       function redraw() {
         drawArrow(fromEl, toEl, move["技名"]);
       }
-      // try immediate and also bind onload
       setTimeout(redraw, 80);
       enemyIcon.onload = redraw;
       allyIcon.onload = redraw;
