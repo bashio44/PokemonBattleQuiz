@@ -301,9 +301,12 @@
     const allyEVElem = document.getElementById("allyEV");
     const allyNatureEl = document.getElementById("allyNature");
     const allyItemEl = document.getElementById("allyItem");
-    const moveLabel = document.getElementById("moveLabel");
-    const arrowLine = document.getElementById("arrowLine");
-    const arrowSvg = document.getElementById("arrowSvg");
+  const moveLabel = document.getElementById("moveLabel");
+  const arrowLine = document.getElementById("arrowLine");
+  const arrowSvg = document.getElementById("arrowSvg");
+  const defenderHpArea = document.getElementById("defenderHpArea");
+  const defenderHpBar = document.getElementById("defenderHpBar");
+  const defenderHpText = document.getElementById("defenderHpText");
 
     let correctAnswer = null;
     let score = 0;
@@ -386,12 +389,31 @@
       enemyIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(enemy["No"])}.png`;
       allyIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(ally["No"])}.png`;
 
-      // 正しい値計算（ダメージは内部で使うが表示しない）
+      // 正しい値計算（ダメージは内部で使う）
       correctDamage = calcDamage({
         atkStat, defStat, movePower, moveType, defenderTypes,
         moveCategory: move["分類"],
         atkEV, defEV, atkNature, defNature, atkItem, defItem
       });
+
+      // 防御側のHPを表示（CSVのHP列を基に割合を計算）
+      const defenderBaseHP = Number((enemyIsAttacker ? ally : enemy)["HP"] || 100);
+      // 現在HPは満タンと仮定して、ダメージ後の割合を計算
+      const afterHp = Math.max(0, defenderBaseHP - correctDamage);
+      const afterRatio = Math.max(0, Math.min(1, afterHp / defenderBaseHP));
+
+      // 表示領域を有効化し、バーとテキストを更新
+      if (defenderHpArea && defenderHpBar && defenderHpText) {
+        defenderHpArea.style.display = 'flex';
+        defenderHpBar.style.width = '100%';
+        defenderHpText.textContent = `${defenderBaseHP} / ${defenderBaseHP}`;
+        // アニメーションで減らすため少し遅延させる
+        setTimeout(() => {
+          defenderHpBar.style.transition = 'width 700ms ease';
+          defenderHpBar.style.width = `${Math.round(afterRatio * 100)}%`;
+          defenderHpText.textContent = `${Math.max(0, Math.round(afterHp))} / ${defenderBaseHP}`;
+        }, 200);
+      }
 
       // 描画する情報（味方は全て表示、敵は不明箇所を ??? にする）
       const enemyEVVal = (enemyIsAttacker ? atkEV : defEV);
