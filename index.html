@@ -175,6 +175,28 @@
       .battle-grid { grid-template-columns: 1fr 160px; grid-template-rows: 160px 160px; }
     }
 
+    /* 自動切替: モバイル用レイアウト（幅が狭いとき） */
+    @media (max-width: 600px) {
+      .quiz-container { padding: 12px; }
+      .battle-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: repeat(6, auto);
+        gap: 10px;
+      }
+      .enemy-info { grid-column: 1; grid-row: 1; text-align: left; }
+      .enemy-icon { grid-column: 1; grid-row: 2; transform: translateX(0); }
+      .enemy-namehp { grid-column: 1; grid-row: 3; text-align: left; }
+      .ally-namehp { grid-column: 1; grid-row: 4; text-align: left; }
+      .ally-icon-wrap { grid-column: 1; grid-row: 5; transform: translateX(0); }
+      .ally-info { grid-column: 1; grid-row: 6; text-align: left; }
+      /* HPバーをやや小さくして全体幅を調整 */
+      .hp-wrap { height: 10px; }
+      .hp-text { font-size: 12px; }
+      .enemy-icon img, .ally-icon-wrap img { width:72px; height:72px; }
+      /* 技ラベルを少し小さく */
+      #moveLabel { font-size: 16px; }
+    }
+
     /* ダークモード配慮は不要のため削除しました */
   </style>
 </head>
