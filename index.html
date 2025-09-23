@@ -323,26 +323,31 @@
 
     function calcDamage({
       atkStat, defStat, movePower, moveType, defenderTypes, moveCategory = '物理',
-      atkEV = 0, defEV = 0,
-      atkNature = 'neutral', defNature = 'neutral',
       atkItem = '', defItem = ''
     }) {
       const level = 50;
-      atkStat = Math.floor(atkStat + atkEV / 8);
-      defStat = Math.floor(defStat + defEV / 8);
-      const natureTable = { 'up': 1.1, 'down': 0.9, 'neutral': 1.0 };
-      atkStat = Math.floor(atkStat * (natureTable[atkNature] || 1.0));
-      defStat = Math.floor(defStat * (natureTable[defNature] || 1.0));
-      let atkItemBoost = 1.0;
-      if (atkItem === 'こだわりハチマキ' && moveCategory === "物理") atkItemBoost = 1.5;
-      if (atkItem === 'こだわりメガネ' && moveCategory === "特殊") atkItemBoost = 1.5;
-      atkStat = Math.floor(atkStat * atkItemBoost);
-      if (defItem === '突撃チョッキ' && moveCategory === "特殊") {
-        defStat = Math.floor(defStat * 1.5);
-      }
-      let base = (((2 * level / 5 + 2) * movePower * atkStat / defStat) / 50) + 2;
+      // atkStat / defStat は既に実数値（努力値・性格反映後）として渡される想定
+      let atkStatAdj = atkStat;
+      let defStatAdj = defStat;
+      // アイテム効果（単純化）
+      if (atkItem === 'こだわりハチマキ' && moveCategory === '物理') atkStatAdj = Math.floor(atkStatAdj * 1.5);
+      if (atkItem === 'こだわりメガネ' && moveCategory === '特殊') atkStatAdj = Math.floor(atkStatAdj * 1.5);
+      if (defItem === '突撃チョッキ' && moveCategory === '特殊') defStatAdj = Math.floor(defStatAdj * 1.5);
+      const base = (((2 * level / 5 + 2) * movePower * atkStatAdj / defStatAdj) / 50) + 2;
       const effectiveness = getTypeEffectiveness(moveType, defenderTypes);
       return Math.floor(base * effectiveness);
+    }
+
+    // 実ステータスを計算するヘルパー
+    function computeStat(base, ev = 0, level = 50, isHP = false, natureMult = 1.0) {
+      const iv = 31; // 簡易的にIVは31固定
+      const ev4 = Math.floor(ev / 4);
+      if (isHP) {
+        return Math.floor(((2 * base + iv + ev4) * level) / 100) + level + 10;
+      } else {
+        const tmp = Math.floor(((2 * base + iv + ev4) * level) / 100) + 5;
+        return Math.floor(tmp * natureMult);
+      }
     }
 
     let pokemonStats = [];
@@ -440,16 +445,22 @@
 
       if (!movePower) return generateQuiz();
 
-      // ランダム性格（簡易）と努力値・持ち物
-      const natures = ['neutral','up','down'];
-      const atkNature = getRandom(natures);
-      const defNature = getRandom(natures);
-      const atkEV = [0, 252][Math.floor(Math.random() * 2)];
-      const defEV = [0, 252][Math.floor(Math.random() * 2)];
-      const atkItems = ["", "こだわりハチマキ", "こだわりメガネ"];
-      const defItems = ["", "突撃チョッキ"];
-      const atkItem = atkItems[Math.floor(Math.random() * atkItems.length)];
-      const defItem = defItems[Math.floor(Math.random() * defItems.length)];
+  // ランダム性格（簡易）と努力値・持ち物
+  const natures = ['neutral','up','down'];
+  const atkNature = getRandom(natures);
+  const defNature = getRandom(natures);
+  // 努力値は HP と 主な攻撃/防御に割り当てる（0 or 252 のランダム）
+  const hpEVChoices = [0, 252];
+  const atkStatEVChoices = [0, 252];
+  const defStatEVChoices = [0, 252];
+  const atkHpEV = hpEVChoices[Math.floor(Math.random() * hpEVChoices.length)];
+  const atkOffEV = atkStatEVChoices[Math.floor(Math.random() * atkStatEVChoices.length)];
+  const defHpEV = hpEVChoices[Math.floor(Math.random() * hpEVChoices.length)];
+  const defDefEV = defStatEVChoices[Math.floor(Math.random() * defStatEVChoices.length)];
+  const atkItems = ["", "こだわりハチマキ", "こだわりメガネ"];
+  const defItems = ["", "突撃チョッキ"];
+  const atkItem = atkItems[Math.floor(Math.random() * atkItems.length)];
+  const defItem = defItems[Math.floor(Math.random() * defItems.length)];
 
       // 出題項目 (敵=当てる対象)
       const qTypes = ["atkEV", "atkItem", "defEV", "defItem"];
@@ -464,17 +475,30 @@
       enemyIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(enemy["No"])}.png`;
       allyIcon.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${Number(ally["No"])}.png`;
 
-      // 正しい値計算（ダメージは内部で使う）
+      // 実数値を計算してダメージを算出（努力値・性格・アイテムを考慮）
+      // 性格は簡易的に攻撃/防御どちらかに1.1/0.9を掛ける場合のみ適用する
+      const natureTable = { 'up': 1.1, 'down': 0.9, 'neutral': 1.0 };
+      const atkNatureMult = natureTable[atkNature] || 1.0;
+      const defNatureMult = natureTable[defNature] || 1.0;
+
+      // 攻撃側の種族値に対応するステータスキー
+      const atkStatKey = (move["分類"] === "物理") ? '攻撃' : '特攻';
+      const defStatKey = (move["分類"] === "物理") ? '防御' : '特防';
+
+      // 実数値計算
+      const atkReal = computeStat(Number(attacker[atkStatKey] || 1), atkOffEV, 50, false, atkNatureMult);
+      const defReal = computeStat(Number(defender[defStatKey] || 1), defDefEV, 50, false, defNatureMult);
+      const atkRealHP = computeStat(Number(attacker['HP'] || 20), atkHpEV, 50, true);
+      const defRealHP = computeStat(Number(defender['HP'] || 20), defHpEV, 50, true);
+
       correctDamage = calcDamage({
-        atkStat, defStat, movePower, moveType, defenderTypes,
-        moveCategory: move["分類"],
-        atkEV, defEV, atkNature, defNature, atkItem, defItem
+        atkStat: atkReal, defStat: defReal, movePower, moveType, defenderTypes,
+        moveCategory: move["分類"], atkItem, defItem
       });
 
-  // 防御側（ダメージを受ける側）のHPを表示（CSVのHP列を基に割合を計算）
-  // ダメージを受ける対象は常に変数 `defender`（先に選んだ防御側）です。
+  // 防御側（ダメージを受ける側）のHPを表示（種族値ではなく実数値を使用）
   const target = defender;
-  const targetBaseHP = Number(target["HP"] || 100);
+  const targetBaseHP = defRealHP; // 実数値
   const afterHp = Math.max(0, targetBaseHP - correctDamage);
   const afterRatio = Math.max(0, Math.min(1, afterHp / targetBaseHP));
 
@@ -501,23 +525,51 @@
       }, 200);
 
       // 描画する情報（味方は全て表示、敵は不明箇所を ??? にする）
-      const enemyEVVal = (enemyIsAttacker ? atkEV : defEV);
+      // 努力値表記を組み立てる（例: H252 B0 または H0 D252）
+      const enemyHpEvVal = (enemyIsAttacker ? atkHpEV : defHpEV);
+      const enemyOffEvVal = (enemyIsAttacker ? atkOffEV : defDefEV);
       const enemyItemVal = (enemyIsAttacker ? atkItem : defItem);
       const enemyNatureVal = (enemyIsAttacker ? atkNature : defNature);
 
-      const allyEVVal = (enemyIsAttacker ? defEV : atkEV);
+      const allyHpEvVal = (enemyIsAttacker ? defHpEV : atkHpEV);
+      const allyOffEvVal = (enemyIsAttacker ? defDefEV : atkOffEV);
       const allyItemVal = (enemyIsAttacker ? defItem : atkItem);
       const allyNatureVal = (enemyIsAttacker ? defNature : atkNature);
 
       // 表示：敵（左上情報、右上アイコン）
       enemyNameEl.textContent = enemy["名前"];
-      enemyEVElem.textContent = '努力値: ' + ((ask === 'atkEV' && enemyIsAttacker) || (ask === 'defEV' && !enemyIsAttacker) ? '？？？' : String(enemyEVVal));
+      // 敵の努力値表示：HPと該当する攻防（攻撃側なら攻撃、被弾側なら防御系）を表記
+      let enemyEvStr = '';
+      if (enemyIsAttacker) {
+        // 敵が攻撃側：表示は HP と攻撃系努力値（物理ならA、特殊ならC）
+        if (move["分類"] === '物理') enemyEvStr = `H${enemyHpEvVal} A${enemyOffEvVal}`;
+        else enemyEvStr = `H${enemyHpEvVal} C${enemyOffEvVal}`;
+      } else {
+        // 敵が被弾側：表示は HP と防御系努力値（物理ならB、特殊ならD）
+        if (move["分類"] === '物理') enemyEvStr = `H${enemyHpEvVal} B${enemyOffEvVal}`;
+        else enemyEvStr = `H${enemyHpEvVal} D${enemyOffEvVal}`;
+      }
+      const hideEnemyEv = ((ask === 'atkEV' && enemyIsAttacker) || (ask === 'defEV' && !enemyIsAttacker));
+      enemyEVElem.textContent = '努力値: ' + (hideEnemyEv ? '？？？' : enemyEvStr);
       enemyNatureEl.textContent = '性格: ' + jpNatureLabel(enemyNatureVal);
       enemyItemEl.textContent = '持ち物: ' + ((ask === 'atkItem' && enemyIsAttacker) || (ask === 'defItem' && !enemyIsAttacker) ? '？？？' : (enemyItemVal || 'なし'));
 
       // 表示：味方（左下）
       allyNameEl.textContent = ally["名前"];
-      allyEVElem.textContent = '努力値: ' + String(allyEVVal);
+      // 味方のEV表示（敵と逆の割り当て）
+      const allyHpEvValLocal = (enemyIsAttacker ? defHpEV : atkHpEV);
+      const allyOffEvValLocal = (enemyIsAttacker ? defDefEV : atkOffEV);
+      let allyEvStr = '';
+      if (!enemyIsAttacker) {
+        // 味方が攻撃側
+        if (move["分類"] === '物理') allyEvStr = `H${allyHpEvValLocal} A${allyOffEvValLocal}`;
+        else allyEvStr = `H${allyHpEvValLocal} C${allyOffEvValLocal}`;
+      } else {
+        // 味方が防御側
+        if (move["分類"] === '物理') allyEvStr = `H${allyHpEvValLocal} B${allyOffEvValLocal}`;
+        else allyEvStr = `H${allyHpEvValLocal} D${allyOffEvValLocal}`;
+      }
+      allyEVElem.textContent = '努力値: ' + String(allyEvStr);
       allyNatureEl.textContent = '性格: ' + jpNatureLabel(allyNatureVal);
       allyItemEl.textContent = '持ち物: ' + (allyItemVal || 'なし');
 
@@ -528,7 +580,8 @@
       let choices = [];
       if (ask === "atkEV" || ask === "defEV") {
         choices = [0, 252].map(String);
-        correctAnswer = String(enemyEVVal);
+        // EV の正解は enemy の該当する攻/防側の EV（enemyOffEvVal）
+        correctAnswer = String(enemyOffEvVal);
       } else if (ask === "atkItem") {
         choices = atkItems.map(v => v || "なし");
         correctAnswer = (enemyItemVal || "なし");
