@@ -471,12 +471,12 @@
         atkEV, defEV, atkNature, defNature, atkItem, defItem
       });
 
-      // 防御側（ダメージを受ける側）のHPを表示（CSVのHP列を基に割合を計算）
-      const targetIsAttacker = (attacker === (enemyIsAttacker ? enemy : ally));
-      const target = (attacker === (enemyIsAttacker ? enemy : ally)) ? attacker : defender;
-      const targetBaseHP = Number(target["HP"] || 100);
-      const afterHp = Math.max(0, targetBaseHP - correctDamage);
-      const afterRatio = Math.max(0, Math.min(1, afterHp / targetBaseHP));
+  // 防御側（ダメージを受ける側）のHPを表示（CSVのHP列を基に割合を計算）
+  // ダメージを受ける対象は常に変数 `defender`（先に選んだ防御側）です。
+  const target = defender;
+  const targetBaseHP = Number(target["HP"] || 100);
+  const afterHp = Math.max(0, targetBaseHP - correctDamage);
+  const afterRatio = Math.max(0, Math.min(1, afterHp / targetBaseHP));
 
       // 味方と敵それぞれのHPバーを同じ固定幅にリセット（見た目同サイズ）
       if (enemyHpBar && allyHpBar) {
@@ -488,8 +488,9 @@
 
       // ダメージは target に当たるので該当バーをアニメーションで減らす
       setTimeout(() => {
-        // 被ダメージ側が enemy か ally か判定して、それぞれのバーを減らす
-        const defenderIsEnemy = ( (enemyIsAttacker && attacker === enemy) || (!enemyIsAttacker && defender === enemy) );
+        // defender 変数が現在の "enemy" オブジェクトと等しければ敵が被弾、
+        // そうでなければ味方が被弾と判定して、それぞれのバーを減らす
+        const defenderIsEnemy = (defender === enemy);
         if (defenderIsEnemy) {
           if (enemyHpBar) enemyHpBar.style.width = `${Math.round(afterRatio * 100)}%`;
           if (enemyHpText) enemyHpText.textContent = `${Math.round(afterRatio * 100)}%`;
