@@ -1,0 +1,201 @@
+:root{
+  --bg: #fff7f0; /* やわらかい背景色に変更 */
+  --card: #ffffff;
+  --primary: #007bff;
+  --primary-dark: #0056b3;
+  --radius: 12px;
+  --gap: 12px;
+}
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  font-family: Inter, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", Arial, sans-serif;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  min-height: 100vh;
+}
+.quiz-container {
+  background: var(--card);
+  padding: clamp(16px, 3.5vw, 28px);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgba(10,10,20,0.08);
+  width: min(92vw, 640px);
+  max-width: 95%;
+  transition: transform 180ms ease;
+  position: relative;
+}
+.quiz-container:focus-within,
+.quiz-container:hover {
+  transform: translateY(-4px);
+}
+
+/* バトル領域：2x2 グリッド */
+.battle-grid {
+  display: grid;
+  grid-template-columns: 1fr 140px 180px; /* 左: info / 中央: icon / 右: name+HP */
+  grid-template-rows: 140px 140px; /* 少し余白を増やし重なりを防止 */
+  gap: 12px;
+  align-items: center;
+  position: relative;
+  margin-bottom: 22px; /* 選択肢との重なりを防ぐために余白を増やす */
+}
+
+/* 左上: 敵の情報（情報を左上に） */
+.enemy-info {
+  grid-column: 1 / 2;
+  grid-row: 1 / 2;
+  text-align: left;
+  padding: 10px;
+  font-size: 14px;
+}
+.enemy-info .label { font-weight: 700; margin-bottom: 6px; display:block; }
+
+/* 右上: 敵アイコン */
+.enemy-icon {
+  grid-column: 2 / 3;
+  grid-row: 1 / 2;
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  padding-right: 12px; /* 右側への余白（敵アイコンの右端距離）*/
+  z-index: 2;
+}
+.enemy-icon img { width:100px; height:100px; }
+
+/* 左下: 味方アイコンと情報（左下に移動） */
+.ally-info {
+  grid-column: 3 / 4; /* 右下 */
+  grid-row: 2 / 3;
+  text-align: right;
+  padding: 10px;
+  font-size: 14px;
+}
+.ally-icon-wrap {
+  grid-column: 2 / 3;
+  grid-row: 2 / 3;
+  display:flex;
+  justify-content:flex-start;
+  align-items:center;
+  padding-left: 12px; /* 左側への余白（味方アイコンの左端距離）*/
+  z-index: 2;
+}
+.ally-icon-wrap img { width:100px; height:100px; }
+.ally-namehp {
+  grid-column: 1 / 2;
+  grid-row: 2 / 3;
+  padding: 8px 10px;
+}
+.enemy-namehp {
+  grid-column: 3 / 4;
+  grid-row: 1 / 2;
+  padding: 8px 10px;
+  text-align: right;
+}
+.name-label { font-weight:700; margin-bottom:8px; }
+/* 固定幅: 文字数6文字分の幅に調整 */
+.name-label { font-weight:700; margin-bottom:8px; display:block; color: #111; }
+/* 全角6文字分に相当させるため 12ch を使用（半角幅の2倍） */
+.name-label, .hp-wrap { width: 12ch; max-width: 12ch; box-sizing: border-box; }
+.name-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hp-wrap { height:12px; background:#eee; border-radius:8px; overflow:hidden; }
+.hp-bar { height:100%; background:#4caf50; width:100%; transition: width 700ms ease; }
+.hp-text { font-size:13px; margin-top:6px; }
+
+/* spacer はそのまま保持（将来拡張用） */
+.spacer {
+  grid-column: 2 / 3;
+  grid-row: 2 / 3;
+}
+
+/* 矢印と技名を重ねるローカルSVG（バトル領域全体を覆う） */
+.arrow-layer {
+  position:absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index: 0; /* 背面に配置 */
+}
+.arrow-svg { width:100%; height:100%; overflow: visible; }
+/* 前面へ出す */
+.enemy-namehp, .ally-namehp, .enemy-info, .ally-info, .enemy-icon, .ally-icon-wrap { z-index: 2; position: relative; }
+/* move label background */
+.move-bg { fill: #ffe6d6; stroke: rgba(0,0,0,0.06); }
+
+/* 選択肢ボタン群 */
+#answers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--gap);
+  margin-top: 12px; /* 余白を増やす */
+}
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(10px, 2.4vw, 14px);
+  border: none;
+  border-radius: 10px;
+  background: var(--primary);
+  color: white;
+  cursor: pointer;
+  font-size: clamp(14px, 2.6vw, 16px);
+  font-weight: 600;
+  transition: background 120ms ease, transform 80ms ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  width: 100%;
+  min-height: 44px;
+}
+button:hover { background: var(--primary-dark); }
+button:active { transform: translateY(1px) scale(0.997); }
+button:focus { outline: 3px solid rgba(0,123,255,0.18); outline-offset: 2px; }
+
+/* ...existing code... */
+
+#result {
+  margin-top: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  min-height: 1.2em;
+  transition: color 120ms ease;
+  text-align:center;
+}
+
+@media (min-width: 900px) {
+  .quiz-container { width: 640px; padding: 28px; }
+  .battle-grid { grid-template-columns: 1fr 160px; grid-template-rows: 160px 160px; }
+}
+
+/* 自動切替: モバイル用レイアウト（幅が狭いとき） */
+@media (max-width: 600px) {
+  .quiz-container { padding: 12px; }
+  .battle-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(6, auto);
+    gap: 10px;
+  }
+  .enemy-info { grid-column: 1; grid-row: 1; text-align: left; }
+  .enemy-icon { grid-column: 1; grid-row: 2; transform: translateX(0); }
+  .enemy-namehp { grid-column: 1; grid-row: 3; text-align: left; }
+  .ally-namehp { grid-column: 1; grid-row: 4; text-align: left; }
+  .ally-icon-wrap { grid-column: 1; grid-row: 5; transform: translateX(0); }
+  .ally-info { grid-column: 1; grid-row: 6; text-align: left; }
+  /* HPバーをやや小さくして全体幅を調整 */
+  .hp-wrap { height: 10px; }
+  .hp-text { font-size: 12px; }
+  .enemy-icon img, .ally-icon-wrap img { width:72px; height:72px; }
+  /* 技ラベルを少し小さく */
+  #moveLabel { font-size: 16px; }
+}
